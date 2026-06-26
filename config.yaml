@@ -1,0 +1,24 @@
+model:
+  num_agents: 10
+  num_tasks: 30
+  dim: 32
+
+  lambda_align: 0.5
+  eta_theta: 0.1
+  eta_memory: 0.05
+
+  temperature_init: 2.0
+  min_temperature: 0.2
+  max_temperature: 3.0
+
+  target_accept_rate: 0.3
+
+  risk_weight: 1.0
+  risk_scale: 1.0
+  interaction_weight: 1.0
+  cost_weight: 1.0
+
+training:
+  iterations: 5000
+  seed: 42
+  log_every: 50
