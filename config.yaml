@@ -7,9 +7,17 @@ model:
   eta_theta: 0.1
   eta_memory: 0.05
 
-  temperature_init: 2.0
-  min_temperature: 0.2
-  max_temperature: 3.0
+  temperature_init: 4.0
+  min_temperature: 1.0
+  max_temperature: 6.0
+  proposal_candidates: 12
+  proposal_task_sample: 8
+  agent_sample_size: 6
+  block_move_size: 4
+  warm_start_steps: 6
+  warm_start_type: greedy
+  hybrid_cleanup_prob: 0.25
+  local_refine_steps: 2
 
   target_accept_rate: 0.3
 

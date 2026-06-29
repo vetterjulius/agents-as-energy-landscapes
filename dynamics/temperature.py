@@ -5,6 +5,7 @@ class TemperatureController:
         self.T_max = T_max
 
     def apply(self, sampler_state):
-        error = sampler_state.acc_rate - self.target_accept
+        # Decrease temperature when acceptance is too high and increase it when acceptance is too low.
+        error = self.target_accept - sampler_state.acc_rate
         sampler_state.T += 0.1 * error
         sampler_state.T = max(self.T_min, min(sampler_state.T, self.T_max))
