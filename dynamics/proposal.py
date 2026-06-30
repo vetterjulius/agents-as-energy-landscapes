@@ -10,12 +10,15 @@ class AssignmentProposal:
         self.agent_sample_size = agent_sample_size
 
     def propose(self, state):
-        if random.random() < 0.55:
+        r = random.random()
+        if r < 0.45:
             return self._guided_single_swap(state)
-        elif random.random() < 0.9:
+        elif r < 0.75:
             return self._guided_block_move(state)
-        else:
+        elif r < 0.95:
             return self._random_swap(state)
+        else:
+            return self._full_single_reassignment(state)
 
     def _guided_single_swap(self, state):
         tasks = self._select_tasks(state, self.num_tasks)
@@ -109,3 +112,27 @@ class AssignmentProposal:
 
         state.X = X_orig
         return X_prop
+
+    def _full_single_reassignment(self, state):
+        X_orig = state.X.clone()
+        best_X = X_orig.clone()
+        best_E, _ = self.energy_registry.compute(state)
+        best_E = best_E.item()
+
+        for t in range(state.M):
+            a_old = torch.argmax(X_orig[:, t]).item()
+            for a_new in range(state.N):
+                if a_new == a_old:
+                    continue
+                X_prop = X_orig.clone()
+                X_prop[a_old, t] = 0.0
+                X_prop[a_new, t] = 1.0
+                state.X = X_prop
+                E, _ = self.energy_registry.compute(state)
+                E_val = E.item()
+                if E_val < best_E:
+                    best_E = E_val
+                    best_X = X_prop.clone()
+
+        state.X = X_orig
+        return best_X

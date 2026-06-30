@@ -8,8 +8,9 @@ from energy.cost import CostEnergy
 from energy.risk import RiskEnergy, RiskPredictor
 from dynamics.theta_update import ThetaUpdater
 from dynamics.memory_update import MemoryUpdater
+from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 
-class GreedyOrchestrator:
+class GreedyOrchestrator(BaseOrchestrator):
     def __init__(self, cfg, initial_state=None, W_risk=None, mode="local_improvement"):
         """
         Greedy Orchestrator Baseline.
@@ -80,6 +81,27 @@ class GreedyOrchestrator:
     def total_energy(self):
         total, _ = self.energy_registry.compute(self.state)
         return total
+
+    def solve(self, tasks: list[Task], agents: list[Agent]) -> Assignment:
+        assignment = Assignment()
+        if not tasks or not agents:
+            return assignment
+        for task in tasks:
+            best_agent = None
+            best_score = float("inf")
+            for agent in agents:
+                if hasattr(agent, "capability_embedding"):
+                    agent_embedding = agent.capability_embedding
+                    agent_id = agent.id
+                else:
+                    agent_embedding = torch.as_tensor(agent["capability_embedding"], dtype=torch.float32)
+                    agent_id = agent["id"]
+                score = float(torch.sum((task.embedding - agent_embedding) ** 2).item())
+                if score < best_score:
+                    best_score = score
+                    best_agent = agent_id
+            assignment[task.id] = best_agent if best_agent is not None else (agents[0].id if hasattr(agents[0], "id") else agents[0]["id"])
+        return assignment
 
     def _find_best_reassignment(self):
         """

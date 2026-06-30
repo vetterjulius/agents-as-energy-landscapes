@@ -128,6 +128,12 @@ class Orchestrator:
             if improved:
                 self.state.X = best_X
 
+        # Additional greedy cleanup on every step for stronger exploitation.
+        if random.random() < 0.35:
+            best_X, _, improved = self._find_best_reassignment()
+            if improved:
+                self.state.X = best_X
+
         self.theta_updater.apply(self.state)
         self.memory_updater.apply(self.state, self.risk_predictor)
         self.temperature_controller.apply(self.sampler)

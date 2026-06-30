@@ -8,8 +8,9 @@ from energy.cost import CostEnergy
 from energy.risk import RiskEnergy, RiskPredictor
 from dynamics.theta_update import ThetaUpdater
 from dynamics.memory_update import MemoryUpdater
+from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 
-class RandomOrchestrator:
+class RandomOrchestrator(BaseOrchestrator):
     def __init__(self, cfg, initial_state=None, W_risk=None):
         """
         Random Orchestrator Baseline.
@@ -67,6 +68,19 @@ class RandomOrchestrator:
     def total_energy(self):
         total, _ = self.energy_registry.compute(self.state)
         return total
+
+    def solve(self, tasks: list[Task], agents: list[Agent]) -> Assignment:
+        assignment = Assignment()
+        if not tasks:
+            return assignment
+        for task in tasks:
+            agent_data = agents[random.randrange(len(agents))]
+            if hasattr(agent_data, "id"):
+                agent_id = agent_data.id
+            else:
+                agent_id = agent_data["id"]
+            assignment[task.id] = agent_id
+        return assignment
 
     def step(self):
         X_new = torch.zeros_like(self.state.X)
