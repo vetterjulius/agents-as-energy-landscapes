@@ -10,6 +10,7 @@ class EnergyRegistry:
         breakdown = {}
         for term in self.terms:
             e = term.compute(state)
-            breakdown[term.name] = e.item()
-            total += term.weight * e
+            weighted_e = term.weight * e
+            breakdown[term.name] = weighted_e.item()
+            total += weighted_e
         return total, breakdown
