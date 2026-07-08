@@ -12,6 +12,47 @@ which provides the `--lf` and `--ff` options, as well as the `cache` fixture.
 See [the docs](https://docs.pytest.org/en/stable/how-to/cache.html) for more information.
 
 
+===== FILE: adapters\agentbench.py =====
+import torch
+
+from adapters.single_agent import EnergySingleAgent
+
+
+SQL_AGENTBENCH_AGENTS = [
+    {"id": "planner", "role": "Planner", "capability_embedding": torch.randn(8), "memory_state": {}},
+    {"id": "sql", "role": "SQL Expert", "capability_embedding": torch.randn(8), "memory_state": {}},
+    {"id": "verifier", "role": "Verifier", "capability_embedding": torch.randn(8), "memory_state": {}}
+]
+
+agent = EnergySingleAgent(SQL_AGENTBENCH_AGENTS)
+
+def infer(input):
+    question = input[-1]["content"]
+    return agent.invoke(question)
+
+
+===== FILE: adapters\single_agent.py =====
+"""Whole system acts as if it was a single agent"""
+
+from orchestrator.energy_orchestrator import EnergyOrchestrator
+from orchestrator.executor import Executor
+from orchestrator.task_decomposer import TaskDecomposer
+
+
+class SingleAgentBase:
+    def __init__(self, agents):
+        self.agents = agents
+    def invoke(self, question):
+        raise NotImplementedError()
+
+class EnergySingleAgent(SingleAgentBase):
+    def invoke(self, question):
+        tasks = TaskDecomposer().decompose(question)
+        assignment = EnergyOrchestrator().solve(tasks, self.agents)
+        answer = Executor().execute(assignment, tasks, self.agents)
+        return answer
+
+
 ===== FILE: aggregate_code_and_benchmarks.py =====
 import os
 from pathlib import Path
