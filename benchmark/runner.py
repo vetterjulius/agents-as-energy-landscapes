@@ -6,6 +6,7 @@ from benchmark.scenarios.independent import IndependentScenario
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.scenarios.dynamic import DynamicScenario
 from benchmark.scenarios.distribution_shift import DistributionShiftScenario
+from benchmark.scenarios.frustrated import FrustratedScenario
 
 from benchmark.baselines.random import RandomOrchestrator
 from benchmark.baselines.greedy import GreedyOrchestrator
@@ -29,7 +30,8 @@ def run_benchmark():
         "Independent": IndependentScenario(),
         "Interaction": InteractionScenario(),
         "Dynamic": DynamicScenario(),
-        "DistributionShift": DistributionShiftScenario()
+        "DistributionShift": DistributionShiftScenario(),
+        "Frustrated": FrustratedScenario()
     }
 
     orchestrators = {
@@ -53,13 +55,14 @@ def run_benchmark():
             X = orchestrator.solve(problem)
             elapsed = time.perf_counter() - start_time
 
-            energy, _ = compute_energy(problem, X)
+            energy, components = compute_energy(problem, X)
             lb = load_balance(X)
             coord = coordination_score(problem, X)
             conflicts = constraint_violations(problem, X)
 
             scenario_results[o_name] = {
                 "energy": energy,
+                "energy_components": components,
                 "load_balance": lb,
                 "coordination": coord,
                 "conflicts": conflicts,
