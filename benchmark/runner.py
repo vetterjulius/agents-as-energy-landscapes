@@ -12,12 +12,19 @@ from benchmark.baselines.random import RandomOrchestrator
 from benchmark.baselines.greedy import GreedyOrchestrator
 from benchmark.baselines.greedy_load_balancing import GreedyLoadBalancingOrchestrator
 from benchmark.baselines.rule_based import RuleBasedOrchestrator
-from benchmark.baselines.energy_based import EnergyBasedOrchestrator
+from benchmark.baselines.energy_based import (
+    EnergyBasedOrchestrator,
+    EnergyPureSAOrchestrator,
+    EnergyHybridOrchestrator,
+    EnergyPureGreedyOrchestrator
+)
 
 from benchmark.evaluation.metrics import compute_energy, load_balance, coordination_score, constraint_violations
 from benchmark.evaluation.report import generate_markdown_report, save_csv_results
 from benchmark.evaluation.plots import plot_results
 from benchmark.ablations import run_representation_ablations, run_solver_ablations
+from benchmark.scale_sweep import run_scale_sweep
+from benchmark.coupling_sweep import run_coupling_sweep
 
 def run_benchmark():
     print("Starting Energy-Based Orchestration Benchmark (EOB)...")
@@ -36,10 +43,12 @@ def run_benchmark():
 
     orchestrators = {
         "Random": RandomOrchestrator(),
-        "Greedy": GreedyOrchestrator(),
+        "Capability Matching (Greedy)": GreedyOrchestrator(),
         "GreedyLB": GreedyLoadBalancingOrchestrator(),
         "RuleBased": RuleBasedOrchestrator(),
-        "EnergyBased (SA)": EnergyBasedOrchestrator(config)
+        "Energy (Pure Greedy)": EnergyPureGreedyOrchestrator(config),
+        "Energy (Pure SA)": EnergyPureSAOrchestrator(config),
+        "Energy (Hybrid)": EnergyHybridOrchestrator(config)
     }
 
     all_results = {}
@@ -91,6 +100,14 @@ def run_benchmark():
     print("\nSolver Ablation Results (Interaction Scenario):")
     for name, energy in sol_ablation_results.items():
         print(f"  {name}: {energy:.4f}")
+
+    # Run Scaling Sweep
+    print("\nRunning Scale Sweep Experiment...")
+    run_scale_sweep()
+
+    # Run Coupling Sweep
+    print("\nRunning Coupling Sweep Experiment...")
+    run_coupling_sweep()
 
     print("\nBenchmark Complete. Results saved in results/")
 

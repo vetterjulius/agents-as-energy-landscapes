@@ -37,15 +37,31 @@ class Orchestrator:
         self.w_int = m["interaction_weight"]
         self.w_cost = m["cost_weight"]
 
+        # modes
+        self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
+        self.search_mode = m.get("search_mode", "hybrid")  # "hybrid", "pure_sa", "pure_greedy"
+
         # guided proposal config
         self.proposal_candidates = m.get("proposal_candidates", 12)
         self.proposal_task_sample = m.get("proposal_task_sample", 8)
         self.agent_sample_size = m.get("agent_sample_size", 6)
         self.block_move_size = m.get("block_move_size", 4)
-        self.warm_start_steps = m.get("warm_start_steps", 6)
-        self.warm_start_type = m.get("warm_start_type", "greedy")
-        self.hybrid_cleanup_prob = m.get("hybrid_cleanup_prob", 0.25)
-        self.local_refine_steps = m.get("local_refine_steps", 2)
+
+        if self.search_mode == "pure_sa":
+            self.warm_start_steps = 0
+            self.warm_start_type = "random"
+            self.hybrid_cleanup_prob = 0.0
+            self.local_refine_steps = 0
+        elif self.search_mode == "pure_greedy":
+            self.warm_start_steps = m.get("warm_start_steps", 6)
+            self.warm_start_type = "greedy"
+            self.hybrid_cleanup_prob = 0.0
+            self.local_refine_steps = m.get("local_refine_steps", 2)
+        else:
+            self.warm_start_steps = m.get("warm_start_steps", 6)
+            self.warm_start_type = m.get("warm_start_type", "greedy")
+            self.hybrid_cleanup_prob = m.get("hybrid_cleanup_prob", 0.25)
+            self.local_refine_steps = m.get("local_refine_steps", 2)
 
         # temperature hyperparameters
         self.T_init = m["temperature_init"]
@@ -77,6 +93,10 @@ class Orchestrator:
             self.state = OrchestrationState(
                 X=X, s=s, c=c, kappa=kappa, Theta=Theta, C=C, N=self.N, M=self.M, d=self.d
             )
+
+        # Clear Theta if pure learning mode is active
+        if self.theta_mode == "dynamic":
+            self.state.Theta = torch.zeros_like(self.state.Theta)
 
         # Risk predictor & energy registry
         if W_risk is not None:
@@ -113,30 +133,46 @@ class Orchestrator:
             self.T_max
         )
 
+        self.converged = False
+
         if self.warm_start_steps > 0:
             self._warm_start()
 
     def step(self):
-        accepted = self.sampler.step(self.state)
+        if self.converged:
+            return
 
-        # Always perform a short local refinement after the SA move.
-        # This is a hybrid approach: global exploration via SA with focused local optimization.
-        self._local_refine(self.local_refine_steps)
-
-        if not accepted and random.random() < self.hybrid_cleanup_prob:
+        if self.search_mode == "pure_greedy":
+            # Pure Greedy search mode: Only local refinement / hill climbing, no stochastic SA steps
             best_X, _, improved = self._find_best_reassignment()
             if improved:
                 self.state.X = best_X
+            else:
+                self.converged = True
+        else:
+            # SA or Hybrid modes
+            accepted = self.sampler.step(self.state)
 
-        # Additional greedy cleanup on every step for stronger exploitation.
-        if random.random() < 0.35:
-            best_X, _, improved = self._find_best_reassignment()
-            if improved:
-                self.state.X = best_X
+            if self.search_mode == "hybrid":
+                # Always perform a short local refinement after the SA move.
+                self._local_refine(self.local_refine_steps)
 
-        self.theta_updater.apply(self.state)
+                if not accepted and random.random() < self.hybrid_cleanup_prob:
+                    best_X, _, improved = self._find_best_reassignment()
+                    if improved:
+                        self.state.X = best_X
+
+                # Additional greedy cleanup on every step for stronger exploitation.
+                if random.random() < 0.35:
+                    best_X, _, improved = self._find_best_reassignment()
+                    if improved:
+                        self.state.X = best_X
+
+        if self.theta_mode != "static":
+            self.theta_updater.apply(self.state)
         self.memory_updater.apply(self.state, self.risk_predictor)
-        self.temperature_controller.apply(self.sampler)
+        if self.search_mode != "pure_greedy":
+            self.temperature_controller.apply(self.sampler)
 
     def total_energy(self):
         total, _ = self.energy_registry.compute(self.state)
