@@ -33,3 +33,20 @@ def plot_results(csv_path="results/benchmark_results.csv", output_dir="results/p
     plt.tight_layout()
     plt.savefig(f"{output_dir}/conflicts_comparison.png")
     plt.close()
+
+    # 3. Energy Breakdown (Stacked Bar)
+    # Identify energy component columns (those not in the basic metrics)
+    basic_cols = ["Scenario", "Orchestrator", "Energy", "LoadBalance", "Coordination", "Conflicts", "Runtime"]
+    component_cols = [c for c in df.columns if c not in basic_cols]
+
+    if component_cols:
+        for scenario in scenarios:
+            subset = df[df['Scenario'] == scenario]
+            subset.set_index('Orchestrator')[component_cols].plot(kind='bar', stacked=True, figsize=(10, 6))
+            plt.title(f"Energy Breakdown - {scenario}")
+            plt.ylabel("Energy")
+            plt.xticks(rotation=45)
+            plt.legend(title="Components", bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.tight_layout()
+            plt.savefig(f"{output_dir}/breakdown_{scenario}.png")
+            plt.close()
