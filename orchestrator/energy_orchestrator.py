@@ -35,7 +35,11 @@ class EnergyOrchestrator(BaseOrchestrator):
         self.w_int = m.get("interaction_weight", 1.0)
         self.w_cost = m.get("cost_weight", 1.0)
 
+        self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
+
         self.state = initial_state.clone() if initial_state is not None else self._build_state_from_config()
+        if self.theta_mode == "dynamic":
+            self.state.Theta = torch.zeros_like(self.state.Theta)
         self.risk_predictor = RiskPredictor(self.d, W_risk=W_risk.clone() if W_risk is not None else None, scale=m.get("risk_scale", 1.0))
 
         self.energy_registry = EnergyRegistry()
@@ -80,11 +84,12 @@ class EnergyOrchestrator(BaseOrchestrator):
 
         self.state.X = torch.zeros(self.state.N, self.state.M)
         for task_idx, task in enumerate(tasks):
-            if task.dependencies:
-                for dep in task.dependencies:
-                    dep_idx = next((idx for idx, candidate in enumerate(tasks) if candidate.id == dep), None)
-                    if dep_idx is not None:
-                        self.state.Theta[task_idx, dep_idx] = 1.0
+            if self.theta_mode != "dynamic":
+                if task.dependencies:
+                    for dep in task.dependencies:
+                        dep_idx = next((idx for idx, candidate in enumerate(tasks) if candidate.id == dep), None)
+                        if dep_idx is not None:
+                            self.state.Theta[task_idx, dep_idx] = 1.0
             best_agent_idx = 0
             best_score = float("inf")
             for agent_idx, agent in enumerate(agents):
@@ -96,13 +101,15 @@ class EnergyOrchestrator(BaseOrchestrator):
             self.state.X[best_agent_idx, task_idx] = 1.0
 
     def _apply_energy_optimization(self, tasks: List[Task], agents: List[Agent]) -> None:
-        self.theta_updater.apply(self.state)
+        if self.theta_mode != "static":
+            self.theta_updater.apply(self.state)
         self.memory_updater.apply(self.state, self.risk_predictor)
         for _ in range(2):
             best_X, _, improved = self._find_best_reassignment()
             if improved:
                 self.state.X = best_X
-            self.theta_updater.apply(self.state)
+            if self.theta_mode != "static":
+                self.theta_updater.apply(self.state)
             self.memory_updater.apply(self.state, self.risk_predictor)
 
     def _find_best_reassignment(self):
