@@ -9,6 +9,8 @@ class EnergyBasedOrchestrator(Orchestrator):
         self.cfg = cfg
         self.search_mode = search_mode
         self.theta_mode = theta_mode
+        self.energy_history = []
+        self.temp_history = []
 
     def solve(self, problem: ProblemInstance) -> torch.Tensor:
         # Map ProblemInstance to OrchestrationState
@@ -63,8 +65,14 @@ class EnergyBasedOrchestrator(Orchestrator):
 
         orchestrator = SystemOrchestrator(model_cfg, initial_state=state, W_risk=problem.risk_weights)
 
+        # Record initial states
+        self.energy_history = [orchestrator.total_energy().item()]
+        self.temp_history = [orchestrator.T]
+
         for _ in range(self.cfg["solver"].get("iterations", 100)):
             orchestrator.step()
+            self.energy_history.append(orchestrator.total_energy().item())
+            self.temp_history.append(orchestrator.T)
 
         return orchestrator.state.X
 
