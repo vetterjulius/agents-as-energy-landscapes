@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from system import load_config
 from model.orchestrator import Orchestrator
+from model.ebmao_orchestrator import EBMAOOrchestrator
 from baselines.greedy import GreedyOrchestrator
 from baselines.random_baseline import RandomOrchestrator
 from benchmarks.synthetic import SyntheticBenchmark
@@ -20,6 +21,7 @@ def main():
     # Each solver maps to a factory function: lambda cfg, init_state, W_risk: Solver(...)
     solvers = {
         "Simulated Annealing (SA)": lambda c, s, w: Orchestrator(c, initial_state=s, W_risk=w),
+        "EBMAO (Proposed)": lambda c, s, w: EBMAOOrchestrator(c, initial_state=s, W_risk=w),
         "Greedy (Local Improvement)": lambda c, s, w: GreedyOrchestrator(c, initial_state=s, W_risk=w, mode="local_improvement"),
         "Greedy (Local Search)": lambda c, s, w: GreedyOrchestrator(c, initial_state=s, W_risk=w, mode="local_search"),
         "Greedy (Construction)": lambda c, s, w: GreedyOrchestrator(c, initial_state=s, W_risk=w, mode="construction"),
