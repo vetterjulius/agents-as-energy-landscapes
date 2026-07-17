@@ -2,15 +2,13 @@ import torch
 from .base import Orchestrator
 from ..scenarios.base import ProblemInstance
 from state.orchestration_state import OrchestrationState
-from model.orchestrator import Orchestrator as SystemOrchestrator
+from model.ebmao_orchestrator import EBMAOOrchestrator as EBMAOSystemOrchestrator
 
-class EnergyBasedOrchestrator(Orchestrator):
+class EBMAOBasedOrchestrator(Orchestrator):
     def __init__(self, cfg, search_mode="hybrid", theta_mode="static"):
         self.cfg = cfg
         self.search_mode = search_mode
         self.theta_mode = theta_mode
-        self.energy_history = []
-        self.temp_history = []
 
     def solve(self, problem: ProblemInstance) -> torch.Tensor:
         # Map ProblemInstance to OrchestrationState
@@ -34,7 +32,7 @@ class EnergyBasedOrchestrator(Orchestrator):
             N=N, M=M, d=d
         )
 
-        # We adapt our config to match what model.Orchestrator expects
+        # We adapt our config to match what model.EBMAOOrchestrator expects
         model_cfg = {
             "model": {
                 "num_agents": N,
@@ -63,27 +61,21 @@ class EnergyBasedOrchestrator(Orchestrator):
             }
         }
 
-        orchestrator = SystemOrchestrator(model_cfg, initial_state=state, W_risk=problem.risk_weights)
-
-        # Record initial states
-        self.energy_history = [orchestrator.total_energy().item()]
-        self.temp_history = [orchestrator.T]
+        orchestrator = EBMAOSystemOrchestrator(model_cfg, initial_state=state, W_risk=problem.risk_weights)
 
         for _ in range(self.cfg["solver"].get("iterations", 100)):
             orchestrator.step()
-            self.energy_history.append(orchestrator.total_energy().item())
-            self.temp_history.append(orchestrator.T)
 
         return orchestrator.state.X
 
-class EnergyPureSAOrchestrator(EnergyBasedOrchestrator):
+class EBMAOPureSAOrchestrator(EBMAOBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
         super().__init__(cfg, search_mode="pure_sa", theta_mode=theta_mode)
 
-class EnergyHybridOrchestrator(EnergyBasedOrchestrator):
+class EBMAOHybridOrchestrator(EBMAOBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
         super().__init__(cfg, search_mode="hybrid", theta_mode=theta_mode)
 
-class EnergyPureGreedyOrchestrator(EnergyBasedOrchestrator):
+class EBMAOPureGreedyOrchestrator(EBMAOBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
         super().__init__(cfg, search_mode="pure_greedy", theta_mode=theta_mode)
