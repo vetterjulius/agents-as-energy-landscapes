@@ -21,6 +21,11 @@ from benchmark.baselines.energy_based import (
     EnergyHybridOrchestrator,
     EnergyPureGreedyOrchestrator
 )
+from benchmark.baselines.ebmao_based import (
+    EBMAOPureSAOrchestrator,
+    EBMAOHybridOrchestrator,
+    EBMAOPureGreedyOrchestrator
+)
 
 from benchmark.evaluation.metrics import (
     compute_energy, load_balance, coordination_score, constraint_violations,
@@ -112,7 +117,10 @@ def run_benchmark():
         # Energy Landscape Solvers
         "Energy (Pure Greedy)": EnergyPureGreedyOrchestrator(config),
         "Energy (Pure SA)": EnergyPureSAOrchestrator(config),
-        "Energy (Hybrid)": EnergyHybridOrchestrator(config)
+        "Energy (Hybrid)": EnergyHybridOrchestrator(config),
+        "EBMAO (Pure Greedy)": EBMAOPureGreedyOrchestrator(config),
+        "EBMAO (Pure SA)": EBMAOPureSAOrchestrator(config),
+        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(config)
     }
 
     # Results structure to accumulate multi-seed metrics

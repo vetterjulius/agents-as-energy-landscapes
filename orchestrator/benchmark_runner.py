@@ -12,6 +12,7 @@ from orchestrator.base import Agent, Assignment, Task
 from orchestrator.executor import Executor
 from orchestrator.llm_planner import LLMPlannerOrchestrator
 from orchestrator.energy_orchestrator import EnergyOrchestrator
+from orchestrator.ebmao_orchestrator import EBMAOOrchestrator
 from orchestrator.task_decomposer import TaskDecomposer
 
 
@@ -88,6 +89,8 @@ class PublicBenchmarkRunner:
             return CapabilityMatchingOrchestrator(cfg)
         if orchestrator_name == "energy":
             return EnergyOrchestrator(cfg)
+        if orchestrator_name == "ebmao":
+            return EBMAOOrchestrator(cfg)
         return EnergyOrchestrator(cfg)
 
     def _build_agents(self) -> List[Agent]:
