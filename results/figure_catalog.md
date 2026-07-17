@@ -140,3 +140,4 @@ These plots show the energy profiles across different scenarios. Minimizing ener
 **Interpretation**:
 - **What this shows**: Bipartite graph mapping agents directly to their assigned tasks, with edge colors representing capability similarity.
 - **Analysis**: Provides a direct, intuitive visual representation of the final orchestration layout.
+
