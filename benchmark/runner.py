@@ -36,6 +36,7 @@ from benchmark.evaluation.plots import plot_results
 from benchmark.ablations import run_representation_ablations, run_solver_ablations
 from benchmark.scale_sweep import run_scale_sweep
 from benchmark.coupling_sweep import run_coupling_sweep
+from benchmark.dynamic_benchmark import run_dynamic_benchmark
 
 def apply_robustness_perturbations(problem, seed, cfg):
     """
@@ -213,6 +214,10 @@ def run_benchmark():
     # Run Coupling Sweep
     print("\nRunning Coupling Sweep Experiment...")
     run_coupling_sweep()
+
+    # Run Dynamic & Long-Horizon Learning Adaptation Benchmark (EBMAO specific properties)
+    print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
+    run_dynamic_benchmark()
 
     print("\nBenchmark Complete. Results and figures saved in results/")
 
