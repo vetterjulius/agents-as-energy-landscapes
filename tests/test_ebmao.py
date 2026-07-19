@@ -93,16 +93,14 @@ def test_ebmao_cost_energy():
     # co = X.T @ X = [[1, 1, 0],
     #                 [1, 1, 0],
     #                 [0, 0, 1]]
-    # Upper triangle for i < j:
-    # (i, j) = (0, 1): C_{0,1} = 1.0, co_{0,1} = 1. 1 - co = 0. Prod = 0
-    # (i, j) = (0, 2): C_{0,2} = 2.0, co_{0,2} = 0. 1 - co = 1. Prod = 2.0
-    # (i, j) = (1, 2): C_{1,2} = 3.0, co_{1,2} = 0. 1 - co = 1. Prod = 3.0
-    # Sum: 5.0.
-    # Normalized: 5.0 / 6.0 = 0.83333333
+    # (state.C * co).sum():
+    # C * co has elements (0,1) -> 1.0, (1,0) -> 1.0. Other elements are 0.
+    # Sum: 2.0.
+    # Normalized: 2.0 / 6.0 = 0.33333333
 
     energy_term = EBMAOCostEnergy(weight=1.0)
     result = energy_term.compute(state)
-    assert abs(result.item() - 5.0 / 6.0) < 1e-5
+    assert abs(result.item() - 2.0 / 6.0) < 1e-5
 
 
 def test_ebmao_memory_updater():
