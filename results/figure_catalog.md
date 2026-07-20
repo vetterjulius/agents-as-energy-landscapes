@@ -9,6 +9,7 @@ This document compiles and structures all figures generated during the benchmark
 4. [Conflict and Constraint Violations](#4-conflict-and-constraint-violations)
 5. [Pareto-Plot (Runtime vs. Energy)](#5-pareto-plot-runtime-vs-energy)
 6. [Emergent Networks & Heatmaps](#6-emergent-networks--heatmaps)
+7. [Dynamic Adaptation & Long-Horizon Learning](#7-dynamic-adaptation--long-horizon-learning)
 
 ## 1. Energy and Optimization Landscapes
 
