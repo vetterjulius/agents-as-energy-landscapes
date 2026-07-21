@@ -420,7 +420,7 @@ class MultiEpisodeSimulator:
 # 3. Adaptation Metrics Computation
 # ----------------------------------------------------------------------
 
-def compute_adaptation_metrics(df, perturb_episode=25, total_episodes=50):
+def compute_adaptation_metrics(df, perturb_episode=25, total_episodes=50, scenario_name=None):
     """
     Computes scientific metrics to evaluate recovery speed, regret, stability,
     and convergence of the system after a perturbation occurs.
@@ -428,16 +428,25 @@ def compute_adaptation_metrics(df, perturb_episode=25, total_episodes=50):
     # Pre-perturbation baseline: average of episodes 15-24
     pre_base = df.loc[df['episode'].between(perturb_episode - 10, perturb_episode - 1), 'energy'].mean()
 
+    # Post-perturbation baseline: average of the last 10 episodes (e.g., episodes 40-49)
+    post_base = df.loc[df['episode'] >= total_episodes - 10, 'energy'].mean()
+
     # Performance drop at perturbation
     ep_pre = df.loc[df['episode'] == perturb_episode - 1, 'energy'].values[0]
     ep_post = df.loc[df['episode'] == perturb_episode, 'energy'].values[0]
     perf_drop = max(0.0, ep_post - ep_pre)
 
-    # Recovery time: first episode index where energy drops below 1.1 * pre_base
+    # For permanent shift scenarios (such as Task Shift or Robustness),
+    # the target baseline is relative to the late post-perturbation stable state (post_base)
+    # instead of pre_base, to avoid metrics defaulting to the maximum limit.
+    is_permanent = scenario_name in ["Task Shift", "Robustness"]
+    target = 1.1 * post_base if is_permanent else 1.1 * pre_base
+
+    # Recovery time: first episode index where energy drops below target
     recovery_time = total_episodes - perturb_episode  # Default to max if never recovered
     for ep in range(perturb_episode, total_episodes):
         val = df.loc[df['episode'] == ep, 'energy'].values[0]
-        if val <= 1.1 * pre_base:
+        if val <= target:
             recovery_time = ep - perturb_episode
             break
 
@@ -519,7 +528,7 @@ def run_dynamic_benchmark():
 
             # If a perturbation/adaptation scenario, compute adaptation metrics
             if s_name in ["Capability Drift", "Task Shift", "Dependency Change", "Robustness"]:
-                metrics = compute_adaptation_metrics(df, perturb_episode=25, total_episodes=num_episodes)
+                metrics = compute_adaptation_metrics(df, perturb_episode=25, total_episodes=num_episodes, scenario_name=s_name)
                 metrics["Scenario"] = s_name
                 metrics["Configuration"] = cfg_name
                 adaptation_data.append(metrics)

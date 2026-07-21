@@ -95,8 +95,8 @@ class EBMAOOrchestrator:
                 X=X, s=s, c=c, kappa=kappa, Theta=Theta, C=C, N=self.N, M=self.M, d=self.d
             )
 
-        # Clear Theta if pure learning mode is active
-        if self.theta_mode == "dynamic":
+        # Clear Theta if pure learning mode is active and we are starting fresh
+        if self.theta_mode == "dynamic" and initial_state is None:
             self.state.Theta = torch.zeros_like(self.state.Theta)
 
         # Risk predictor & energy registry

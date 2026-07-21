@@ -267,6 +267,8 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 
 
+
+
 ## Scientific Evaluation of Dynamic Landscape Adaptation (EBMAO)
 
 Unlike static optimization baselines, the core contribution of EBMAO is its **adaptive energy landscape** powered by dual-timescale learning (dynamic memory $\kappa$ and running co-assignment $\Theta$). Below, we report the exact scientific metrics comparing the static energy system with EBMAO and its ablated variants in non-stationary and long-horizon scenarios.
@@ -283,7 +285,7 @@ In this scenario, agent expertise changes abruptly at episode 25 (e.g., Agent 0 
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Static Energy | 1.7851 $\pm$ 0.3242 | 1.7985 $\pm$ 0.5396 | 7.80 $\pm$ 3.80 | 4.76 $\pm$ 3.13 | 0.3964 $\pm$ 0.0688 | 6.7000 $\pm$ 1.5286 |
 | EBMAO (kappa-only) | 1.7821 $\pm$ 0.3151 | 1.8297 $\pm$ 0.5269 | 8.04 $\pm$ 3.76 | 4.96 $\pm$ 3.06 | 0.3979 $\pm$ 0.0670 | 6.7400 $\pm$ 1.4820 |
-| EBMAO (theta-only) | 1.7841 $\pm$ 0.3270 | 1.7556 $\pm$ 0.4822 | 7.40 $\pm$ 3.51 | 4.56 $\pm$ 3.10 | 0.3988 $\pm$ 0.0673 | 6.7000 $\pm$ 1.5940 |
+| EBMAO (theta-only) | 1.7834 $\pm$ 0.3273 | 1.7530 $\pm$ 0.4812 | 7.40 $\pm$ 3.51 | 4.56 $\pm$ 3.10 | 0.3996 $\pm$ 0.0674 | 6.7200 $\pm$ 1.5913 |
 | Full EBMAO | 1.7812 $\pm$ 0.3252 | 1.7301 $\pm$ 0.4811 | 7.36 $\pm$ 3.46 | 4.64 $\pm$ 3.17 | 0.4013 $\pm$ 0.0664 | 6.8800 $\pm$ 1.5338 |
 
 #### Scenario: Task Shift
@@ -296,7 +298,7 @@ The task distribution shifts abruptly at episode 25, requiring agents to perform
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Static Energy | 2.5881 $\pm$ 0.9998 | 2.5588 $\pm$ 0.8466 | 12.40 $\pm$ 6.27 | 7.68 $\pm$ 4.47 | 0.4421 $\pm$ 0.0720 | 5.4600 $\pm$ 1.8206 |
 | EBMAO (kappa-only) | 2.5845 $\pm$ 1.0003 | 2.5636 $\pm$ 0.8378 | 12.48 $\pm$ 6.14 | 7.68 $\pm$ 4.30 | 0.4430 $\pm$ 0.0717 | 5.5400 $\pm$ 1.8758 |
-| EBMAO (theta-only) | 2.5885 $\pm$ 1.0003 | 2.4673 $\pm$ 0.8345 | 11.88 $\pm$ 6.32 | 7.36 $\pm$ 4.56 | 0.4443 $\pm$ 0.0697 | 5.5400 $\pm$ 1.7404 |
+| EBMAO (theta-only) | 2.5879 $\pm$ 1.0009 | 2.4647 $\pm$ 0.8362 | 11.88 $\pm$ 6.32 | 7.36 $\pm$ 4.56 | 0.4451 $\pm$ 0.0694 | 5.5600 $\pm$ 1.7515 |
 | Full EBMAO | 2.5855 $\pm$ 1.0003 | 2.5186 $\pm$ 0.8371 | 12.16 $\pm$ 6.37 | 7.52 $\pm$ 4.42 | 0.4449 $\pm$ 0.0691 | 5.5200 $\pm$ 1.8543 |
 
 #### Scenario: Dependency Change
@@ -342,10 +344,10 @@ Evaluates resilience under complex compound perturbations. An agent fails (leave
 
 | Configuration | Recovery Time (episodes) | Cumulative Regret | Late Stability (reconfig) | Late Convergence (std) | Performance Drop |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 7.50 | 16.74 | 5.9250 | 0.3636 | 1.2152 |
-| EBMAO (kappa-only) | 7.00 | 16.65 | 6.0250 | 0.3576 | 1.1948 |
-| EBMAO (theta-only) | 7.00 | 16.73 | 6.0000 | 0.3668 | 1.2115 |
-| Full EBMAO | 7.00 | 16.58 | 6.1250 | 0.3618 | 1.1980 |
+| Static Energy | 2.75 | 16.74 | 5.9250 | 0.3636 | 1.2152 |
+| EBMAO (kappa-only) | 2.25 | 16.65 | 6.0250 | 0.3576 | 1.1948 |
+| EBMAO (theta-only) | 2.25 | 16.73 | 6.0000 | 0.3668 | 1.2115 |
+| Full EBMAO | 2.25 | 16.58 | 6.1250 | 0.3618 | 1.1980 |
 
 ### Scientific Analysis & Discussion
 - **The Power of Adaptive Landscape**: Static energy optimization has no memory and no structural learning. When agent expertise drifts or task distributions shift, it suffers massive energy spikes and takes extremely long to re-converge, incurring high cumulative regret. In contrast, **Full EBMAO achieves the fastest recovery times** and slashes cumulative regret by more than 70%.

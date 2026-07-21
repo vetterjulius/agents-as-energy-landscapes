@@ -38,7 +38,7 @@ class EnergyOrchestrator(BaseOrchestrator):
         self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
 
         self.state = initial_state.clone() if initial_state is not None else self._build_state_from_config()
-        if self.theta_mode == "dynamic":
+        if self.theta_mode == "dynamic" and initial_state is None:
             self.state.Theta = torch.zeros_like(self.state.Theta)
         self.risk_predictor = RiskPredictor(self.d, W_risk=W_risk.clone() if W_risk is not None else None, scale=m.get("risk_scale", 1.0))
 
