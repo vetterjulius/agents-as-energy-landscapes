@@ -12,13 +12,17 @@ class AssignmentProposal:
     def propose(self, state):
         r = random.random()
         if r < 0.45:
-            return self._guided_single_swap(state)
+            prop = self._guided_single_swap(state)
         elif r < 0.75:
-            return self._guided_block_move(state)
+            prop = self._guided_block_move(state)
         elif r < 0.95:
-            return self._random_swap(state)
+            prop = self._random_swap(state)
         else:
-            return self._full_single_reassignment(state)
+            prop = self._full_single_reassignment(state)
+
+        if torch.equal(prop, state.X):
+            prop = self._random_swap(state)
+        return prop
 
     def _guided_single_swap(self, state):
         tasks = self._select_tasks(state, self.num_tasks)
