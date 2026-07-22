@@ -22,6 +22,7 @@ def main():
     # Force risk_scale to 0.01 temporarily to match the original model's hardcoded scaling for comparison
     cfg_compat = yaml.safe_load(yaml.dump(cfg))  # Deep copy
     cfg_compat["model"]["risk_scale"] = 0.01
+    cfg_compat["model"]["warm_start_steps"] = 0
 
     print("Initializing Original Model...")
     torch.manual_seed(seed)

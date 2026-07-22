@@ -271,7 +271,7 @@ class MultiEpisodeSimulator:
         # Create base config with fast parameters
         base_cfg = {
             "solver": {
-                "iterations": 3,  # Fast iterations per episode
+                "iterations": 5,  # Fast but sufficient iterations per episode
                 "temperature_init": 1.0,
                 "min_temperature": 0.01,
                 "max_temperature": 2.0,
@@ -294,6 +294,7 @@ class MultiEpisodeSimulator:
         # Carry-over structures
         carried_kappa = {}  # agent_id -> kappa_vector
         carried_Theta = None # Tensor
+        carried_running_co = None
 
         history = []
         prev_X = None
@@ -316,7 +317,7 @@ class MultiEpisodeSimulator:
                     kappa[i] = carried_kappa[a.id]
 
             # Reconstruct carrying-over structural dependencies (Theta)
-            if carried_Theta is not None and carried_Theta.shape == (M, M):
+            if theta_enabled and carried_Theta is not None and carried_Theta.shape == (M, M):
                 Theta = carried_Theta.clone()
             else:
                 Theta = problem.interaction_graph.clone()
@@ -367,6 +368,8 @@ class MultiEpisodeSimulator:
             }
 
             orchestrator = EBMAOOrchestrator(model_cfg, initial_state=state, W_risk=problem.risk_weights)
+            if theta_enabled and carried_running_co is not None and hasattr(orchestrator, "theta_updater") and orchestrator.theta_updater is not None:
+                orchestrator.theta_updater.running_co = carried_running_co.clone()
 
             # Solve!
             for _ in range(base_cfg["solver"]["iterations"]):
@@ -411,6 +414,10 @@ class MultiEpisodeSimulator:
                 carried_kappa[a.id] = orchestrator.state.kappa[i].clone()
 
             carried_Theta = orchestrator.state.Theta.clone()
+            if theta_enabled and hasattr(orchestrator, "theta_updater") and orchestrator.theta_updater is not None:
+                carried_running_co = orchestrator.theta_updater.running_co
+            else:
+                carried_running_co = None
             prev_X = X_final.clone()
 
         return pd.DataFrame(history)

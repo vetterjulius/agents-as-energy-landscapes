@@ -269,6 +269,14 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 
 
+
+
+
+
+
+
+
+
 ## Scientific Evaluation of Dynamic Landscape Adaptation (EBMAO)
 
 Unlike static optimization baselines, the core contribution of EBMAO is its **adaptive energy landscape** powered by dual-timescale learning (dynamic memory $\kappa$ and running co-assignment $\Theta$). Below, we report the exact scientific metrics comparing the static energy system with EBMAO and its ablated variants in non-stationary and long-horizon scenarios.
@@ -283,10 +291,10 @@ In this scenario, agent expertise changes abruptly at episode 25 (e.g., Agent 0 
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 1.7851 $\pm$ 0.3242 | 1.7985 $\pm$ 0.5396 | 7.80 $\pm$ 3.80 | 4.76 $\pm$ 3.13 | 0.3964 $\pm$ 0.0688 | 6.7000 $\pm$ 1.5286 |
-| EBMAO (kappa-only) | 1.7821 $\pm$ 0.3151 | 1.8297 $\pm$ 0.5269 | 8.04 $\pm$ 3.76 | 4.96 $\pm$ 3.06 | 0.3979 $\pm$ 0.0670 | 6.7400 $\pm$ 1.4820 |
-| EBMAO (theta-only) | 1.7834 $\pm$ 0.3273 | 1.7530 $\pm$ 0.4812 | 7.40 $\pm$ 3.51 | 4.56 $\pm$ 3.10 | 0.3996 $\pm$ 0.0674 | 6.7200 $\pm$ 1.5913 |
-| Full EBMAO | 1.7812 $\pm$ 0.3252 | 1.7301 $\pm$ 0.4811 | 7.36 $\pm$ 3.46 | 4.64 $\pm$ 3.17 | 0.4013 $\pm$ 0.0664 | 6.8800 $\pm$ 1.5338 |
+| Static Energy | 1.7584 $\pm$ 0.3183 | 1.8036 $\pm$ 0.5219 | 8.36 $\pm$ 3.61 | 4.84 $\pm$ 3.03 | 0.4001 $\pm$ 0.0707 | 7.3000 $\pm$ 1.7053 |
+| EBMAO (kappa-only) | 1.7556 $\pm$ 0.3185 | 1.7776 $\pm$ 0.5534 | 8.48 $\pm$ 3.49 | 4.92 $\pm$ 3.14 | 0.4056 $\pm$ 0.0714 | 7.3600 $\pm$ 1.7233 |
+| EBMAO (theta-only) | 1.7684 $\pm$ 0.3188 | 1.6891 $\pm$ 0.5120 | 6.96 $\pm$ 3.43 | 4.40 $\pm$ 3.08 | 0.4026 $\pm$ 0.0696 | 7.2400 $\pm$ 1.7445 |
+| Full EBMAO | 1.7643 $\pm$ 0.3172 | 1.6880 $\pm$ 0.5156 | 7.12 $\pm$ 3.57 | 4.52 $\pm$ 3.18 | 0.4063 $\pm$ 0.0689 | 7.3800 $\pm$ 1.7130 |
 
 #### Scenario: Task Shift
 
@@ -296,10 +304,10 @@ The task distribution shifts abruptly at episode 25, requiring agents to perform
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 2.5881 $\pm$ 0.9998 | 2.5588 $\pm$ 0.8466 | 12.40 $\pm$ 6.27 | 7.68 $\pm$ 4.47 | 0.4421 $\pm$ 0.0720 | 5.4600 $\pm$ 1.8206 |
-| EBMAO (kappa-only) | 2.5845 $\pm$ 1.0003 | 2.5636 $\pm$ 0.8378 | 12.48 $\pm$ 6.14 | 7.68 $\pm$ 4.30 | 0.4430 $\pm$ 0.0717 | 5.5400 $\pm$ 1.8758 |
-| EBMAO (theta-only) | 2.5879 $\pm$ 1.0009 | 2.4647 $\pm$ 0.8362 | 11.88 $\pm$ 6.32 | 7.36 $\pm$ 4.56 | 0.4451 $\pm$ 0.0694 | 5.5600 $\pm$ 1.7515 |
-| Full EBMAO | 2.5855 $\pm$ 1.0003 | 2.5186 $\pm$ 0.8371 | 12.16 $\pm$ 6.37 | 7.52 $\pm$ 4.42 | 0.4449 $\pm$ 0.0691 | 5.5200 $\pm$ 1.8543 |
+| Static Energy | 2.5708 $\pm$ 1.0033 | 2.5683 $\pm$ 0.8827 | 12.80 $\pm$ 6.31 | 7.80 $\pm$ 4.45 | 0.4459 $\pm$ 0.0703 | 5.7400 $\pm$ 2.1553 |
+| EBMAO (kappa-only) | 2.5705 $\pm$ 1.0046 | 2.5772 $\pm$ 0.8379 | 12.88 $\pm$ 6.16 | 7.68 $\pm$ 4.41 | 0.4465 $\pm$ 0.0710 | 5.8000 $\pm$ 2.1093 |
+| EBMAO (theta-only) | 2.5762 $\pm$ 1.0045 | 2.4663 $\pm$ 0.8615 | 11.92 $\pm$ 6.48 | 7.36 $\pm$ 4.60 | 0.4468 $\pm$ 0.0680 | 5.9000 $\pm$ 2.0025 |
+| Full EBMAO | 2.5747 $\pm$ 1.0038 | 2.5028 $\pm$ 0.8726 | 12.04 $\pm$ 6.56 | 7.40 $\pm$ 4.39 | 0.4477 $\pm$ 0.0672 | 5.8400 $\pm$ 2.1415 |
 
 #### Scenario: Dependency Change
 
@@ -309,10 +317,10 @@ Task dependencies (Theta) undergo a sudden structural change at episode 25. This
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 1.7426 $\pm$ 0.3277 | 1.8607 $\pm$ 0.4491 | 4.68 $\pm$ 2.48 | 0.00 $\pm$ 0.00 | 0.3905 $\pm$ 0.0776 | 6.6800 $\pm$ 1.6092 |
-| EBMAO (kappa-only) | 1.7368 $\pm$ 0.3284 | 1.8506 $\pm$ 0.5001 | 4.80 $\pm$ 2.62 | 0.00 $\pm$ 0.00 | 0.3937 $\pm$ 0.0754 | 6.8000 $\pm$ 1.6413 |
-| EBMAO (theta-only) | 1.7450 $\pm$ 0.3356 | 1.8385 $\pm$ 0.4286 | 4.44 $\pm$ 2.60 | 0.00 $\pm$ 0.00 | 0.3919 $\pm$ 0.0775 | 6.8200 $\pm$ 1.5477 |
-| Full EBMAO | 1.7365 $\pm$ 0.3354 | 1.7984 $\pm$ 0.5107 | 4.52 $\pm$ 2.64 | 0.00 $\pm$ 0.00 | 0.3965 $\pm$ 0.0738 | 6.8600 $\pm$ 1.5120 |
+| Static Energy | 1.7040 $\pm$ 0.3099 | 1.9053 $\pm$ 0.4845 | 5.72 $\pm$ 3.10 | 0.00 $\pm$ 0.00 | 0.3962 $\pm$ 0.0725 | 7.1000 $\pm$ 1.7525 |
+| EBMAO (kappa-only) | 1.6987 $\pm$ 0.3112 | 1.8558 $\pm$ 0.6356 | 5.64 $\pm$ 3.37 | 0.00 $\pm$ 0.00 | 0.4021 $\pm$ 0.0716 | 7.2800 $\pm$ 1.7501 |
+| EBMAO (theta-only) | 1.7164 $\pm$ 0.3140 | 1.7881 $\pm$ 0.4874 | 4.48 $\pm$ 2.54 | 0.00 $\pm$ 0.00 | 0.4011 $\pm$ 0.0703 | 7.1200 $\pm$ 1.7687 |
+| Full EBMAO | 1.7115 $\pm$ 0.3147 | 1.7480 $\pm$ 0.5293 | 4.56 $\pm$ 2.65 | 0.00 $\pm$ 0.00 | 0.4050 $\pm$ 0.0699 | 7.2200 $\pm$ 1.7646 |
 
 #### Scenario: Emergent Specialization
 
@@ -335,19 +343,19 @@ Evaluates resilience under complex compound perturbations. An agent fails (leave
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 1.8085 $\pm$ 0.4121 | 2.5821 $\pm$ 0.9652 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.2942 $\pm$ 0.1509 | 5.5200 $\pm$ 2.1404 |
-| EBMAO (kappa-only) | 1.8017 $\pm$ 0.4086 | 2.4396 $\pm$ 0.8816 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3089 $\pm$ 0.1402 | 5.7000 $\pm$ 2.0727 |
-| EBMAO (theta-only) | 1.8085 $\pm$ 0.4121 | 2.5821 $\pm$ 0.9652 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.2942 $\pm$ 0.1509 | 5.5200 $\pm$ 2.1404 |
-| Full EBMAO | 1.8017 $\pm$ 0.4086 | 2.4396 $\pm$ 0.8816 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3089 $\pm$ 0.1402 | 5.7000 $\pm$ 2.0727 |
+| Static Energy | 1.7930 $\pm$ 0.3968 | 2.5629 $\pm$ 0.9905 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3016 $\pm$ 0.1496 | 5.7200 $\pm$ 2.3651 |
+| EBMAO (kappa-only) | 1.7856 $\pm$ 0.3945 | 2.4544 $\pm$ 0.8647 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3146 $\pm$ 0.1402 | 5.9800 $\pm$ 2.3167 |
+| EBMAO (theta-only) | 1.7930 $\pm$ 0.3968 | 2.5629 $\pm$ 0.9905 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3016 $\pm$ 0.1496 | 5.7200 $\pm$ 2.3651 |
+| Full EBMAO | 1.7856 $\pm$ 0.3945 | 2.4544 $\pm$ 0.8647 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3146 $\pm$ 0.1402 | 5.9800 $\pm$ 2.3167 |
 
 ### Dynamic Adaptation Summary Metrics (Mean across Scenarios)
 
 | Configuration | Recovery Time (episodes) | Cumulative Regret | Late Stability (reconfig) | Late Convergence (std) | Performance Drop |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 2.75 | 16.74 | 5.9250 | 0.3636 | 1.2152 |
-| EBMAO (kappa-only) | 2.25 | 16.65 | 6.0250 | 0.3576 | 1.1948 |
-| EBMAO (theta-only) | 2.25 | 16.73 | 6.0000 | 0.3668 | 1.2115 |
-| Full EBMAO | 2.25 | 16.58 | 6.1250 | 0.3618 | 1.1980 |
+| Static Energy | 2.25 | 16.49 | 6.1000 | 0.3585 | 1.1868 |
+| EBMAO (kappa-only) | 2.25 | 16.35 | 6.3750 | 0.3560 | 1.1732 |
+| EBMAO (theta-only) | 2.25 | 16.62 | 6.3250 | 0.3565 | 1.1937 |
+| Full EBMAO | 2.25 | 16.50 | 6.3750 | 0.3541 | 1.1801 |
 
 ### Scientific Analysis & Discussion
 - **The Power of Adaptive Landscape**: Static energy optimization has no memory and no structural learning. When agent expertise drifts or task distributions shift, it suffers massive energy spikes and takes extremely long to re-converge, incurring high cumulative regret. In contrast, **Full EBMAO achieves the fastest recovery times** and slashes cumulative regret by more than 70%.
