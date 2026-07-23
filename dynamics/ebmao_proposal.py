@@ -2,9 +2,10 @@ import random
 import torch
 
 class EBMAOAssignmentProposal:
-    def __init__(self, energy_registry, lambda_align=0.5, num_tasks=4, block_size=3, agent_sample_size=None):
+    def __init__(self, energy_registry, lambda_align=0.5, lambda_memory=None, num_tasks=4, block_size=3, agent_sample_size=None):
         self.energy_registry = energy_registry
         self.lambda_align = lambda_align
+        self.lambda_memory = lambda_memory if lambda_memory is not None else lambda_align
         self.num_tasks = max(1, int(num_tasks))
         self.block_size = max(1, int(block_size))
         self.agent_sample_size = agent_sample_size
@@ -20,7 +21,8 @@ class EBMAOAssignmentProposal:
         else:
             X_prop = self._full_single_reassignment(state)
 
-        if torch.equal(X_prop, state.X):
+        # Keep random fallback to ensure no no-op proposals are allowed
+        if torch.equal(X_prop, state.X) and state.N > 1:
             X_prop = self._random_swap(state)
         return X_prop
 
@@ -51,11 +53,12 @@ class EBMAOAssignmentProposal:
         agent_s = state.s[assigned]
         agent_k = state.kappa[assigned]
 
-        # In EBMAO, the assignment term inside parenthesis is: ||s_a - c_i||^2 - \lambda s_a^\top \kappa_a
+        # In EBMAO, the assignment term inside parenthesis is: ||s_a - c_i||^2 - \lambda_1 s_a^\top c_i - \lambda_2 s_a^\top \kappa_a
         dist = torch.sum((agent_s - state.c) ** 2, dim=1)
+        align_sc = torch.sum(agent_s * state.c, dim=1)
         align_mem = torch.sum(agent_s * agent_k, dim=1)
 
-        importance = dist - self.lambda_align * align_mem
+        importance = dist - self.lambda_align * align_sc - self.lambda_memory * align_mem
         _, top_idxs = torch.topk(importance, k, largest=True)
         return top_idxs.tolist()
 

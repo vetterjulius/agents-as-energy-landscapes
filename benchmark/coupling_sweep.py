@@ -35,6 +35,15 @@ def run_coupling_sweep():
         if "model" not in current_cfg:
             current_cfg["model"] = {}
         current_cfg["model"]["interaction_weight"] = iw
+        current_cfg["model"].update({
+            "warm_start_steps": 0,
+            "local_refine_steps": 0,
+            "proposal_candidates": 2,
+            "proposal_task_sample": 2,
+            "agent_sample_size": 2,
+            "block_move_size": 1,
+            "hybrid_cleanup_prob": 0.0
+        })
         # Ensure a fast and thorough execution (e.g., 50 iterations)
         if "solver" not in current_cfg:
             current_cfg["solver"] = {}

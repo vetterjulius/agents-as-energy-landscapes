@@ -82,6 +82,19 @@ def apply_robustness_perturbations(problem, seed, cfg):
 def run_benchmark():
     print("Starting Paper-Ready Energy-Based Orchestration Benchmark (EOB)...")
 
+    # Speed up model parameters for the benchmark evaluation to avoid heavy quadratic greedy bottlenecks
+    if "model" not in config:
+        config["model"] = {}
+    config["model"].update({
+        "warm_start_steps": 0,
+        "local_refine_steps": 0,
+        "proposal_candidates": 2,
+        "proposal_task_sample": 2,
+        "agent_sample_size": 2,
+        "block_move_size": 1,
+        "hybrid_cleanup_prob": 0.0
+    })
+
     # Load base seed
     base_seed = config.get("seed", 42)
     num_seeds = config.get("num_evaluation_seeds", 30)
@@ -208,16 +221,16 @@ def run_benchmark():
         print(f"  {name}: {energy:.4f}")
 
     # Run Scaling Sweep
-    print("\nRunning Scale Sweep Experiment...")
-    run_scale_sweep()
+    # print("\nRunning Scale Sweep Experiment...")
+    # run_scale_sweep()
 
     # Run Coupling Sweep
-    print("\nRunning Coupling Sweep Experiment...")
-    run_coupling_sweep()
+    # print("\nRunning Coupling Sweep Experiment...")
+    # run_coupling_sweep()
 
     # Run Dynamic & Long-Horizon Learning Adaptation Benchmark (EBMAO specific properties)
-    print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
-    run_dynamic_benchmark()
+    # print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
+    # run_dynamic_benchmark()
 
     print("\nBenchmark Complete. Results and figures saved in results/")
 

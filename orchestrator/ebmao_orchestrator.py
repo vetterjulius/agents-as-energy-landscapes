@@ -30,6 +30,7 @@ class EBMAOOrchestrator(BaseOrchestrator):
         self.d = m.get("dim", 8)
 
         self.lambda_align = m.get("lambda_align", 0.5)
+        self.lambda_memory = m.get("lambda_memory", self.lambda_align)
         self.eta_theta = m.get("eta_theta", 0.1)
         self.eta_memory = m.get("eta_memory", 0.05)
         self.w_risk = m.get("risk_weight", 1.0)
@@ -44,7 +45,7 @@ class EBMAOOrchestrator(BaseOrchestrator):
         self.risk_predictor = RiskPredictor(self.d, W_risk=W_risk.clone() if W_risk is not None else None, scale=m.get("risk_scale", 1.0))
 
         self.energy_registry = EnergyRegistry()
-        self.energy_registry.add(EBMAOAssignmentEnergy(self.lambda_align, weight=1.0))
+        self.energy_registry.add(EBMAOAssignmentEnergy(self.lambda_align, self.lambda_memory, weight=1.0))
         self.energy_registry.add(EBMAOInteractionEnergy(weight=self.w_int))
         self.energy_registry.add(EBMAOCostEnergy(weight=self.w_cost))
         self.energy_registry.add(EBMAORiskEnergy(self.risk_predictor, weight=self.w_risk))

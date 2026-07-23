@@ -69,7 +69,7 @@ class Orchestrator:
         self.T_max = m["max_temperature"]
         self.target_accept = m["target_accept_rate"]
 
-        # Initialize tensors in the exact sequence as the original implementation to preserve random seeds
+        # Initialize tensors in the exact sequence to preserve random seeds
         s = torch.randn(self.N, self.d)
         c = torch.randn(self.M, self.d)
         kappa = torch.zeros(self.N, self.d)
@@ -143,7 +143,7 @@ class Orchestrator:
             return
 
         if self.search_mode == "pure_greedy":
-            # Pure Greedy search mode: Only local refinement / hill climbing, no stochastic SA steps
+            # Pure Greedy search mode
             best_X, _, improved = self._find_best_reassignment()
             if improved:
                 self.state.X = best_X
@@ -154,7 +154,6 @@ class Orchestrator:
             accepted = self.sampler.step(self.state)
 
             if self.search_mode == "hybrid":
-                # Always perform a short local refinement after the SA move.
                 self._local_refine(self.local_refine_steps)
 
                 if not accepted and random.random() < self.hybrid_cleanup_prob:
@@ -163,7 +162,7 @@ class Orchestrator:
                         self.state.X = best_X
 
                 # Additional greedy cleanup on every step for stronger exploitation.
-                if random.random() < 0.35:
+                if self.local_refine_steps > 0 and random.random() < 0.35:
                     best_X, _, improved = self._find_best_reassignment()
                     if improved:
                         self.state.X = best_X

@@ -31,6 +31,7 @@ class EBMAOOrchestrator:
 
         # hyperparameters
         self.lambda_align = m["lambda_align"]
+        self.lambda_memory = m.get("lambda_memory", self.lambda_align)
         self.eta_theta = m["eta_theta"]
         self.eta_memory = m["eta_memory"]
 
@@ -106,7 +107,7 @@ class EBMAOOrchestrator:
             self.risk_predictor = RiskPredictor(self.d, W_risk=W_risk_gen)
 
         self.energy_registry = EnergyRegistry()
-        self.energy_registry.add(EBMAOAssignmentEnergy(self.lambda_align, weight=1.0))
+        self.energy_registry.add(EBMAOAssignmentEnergy(self.lambda_align, self.lambda_memory, weight=1.0))
         self.energy_registry.add(EBMAOInteractionEnergy(weight=self.w_int))
         self.energy_registry.add(EBMAOCostEnergy(weight=self.w_cost))
         self.energy_registry.add(EBMAORiskEnergy(self.risk_predictor, weight=self.w_risk))
@@ -115,6 +116,7 @@ class EBMAOOrchestrator:
         self.proposal_mechanism = EBMAOAssignmentProposal(
             self.energy_registry,
             lambda_align=self.lambda_align,
+            lambda_memory=self.lambda_memory,
             num_tasks=self.proposal_task_sample,
             block_size=self.block_move_size,
             agent_sample_size=self.agent_sample_size
@@ -162,7 +164,7 @@ class EBMAOOrchestrator:
                     if improved:
                         self.state.X = best_X
 
-                if random.random() < 0.35:
+                if self.local_refine_steps > 0 and random.random() < 0.35:
                     best_X, _, improved = self._find_best_reassignment()
                     if improved:
                         self.state.X = best_X
