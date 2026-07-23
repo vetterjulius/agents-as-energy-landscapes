@@ -277,6 +277,8 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 
 
+
+
 ## Scientific Evaluation of Dynamic Landscape Adaptation (EBMAO)
 
 Unlike static optimization baselines, the core contribution of EBMAO is its **adaptive energy landscape** powered by dual-timescale learning (dynamic memory $\kappa$ and running co-assignment $\Theta$). Below, we report the exact scientific metrics comparing the static energy system with EBMAO and its ablated variants in non-stationary and long-horizon scenarios.
