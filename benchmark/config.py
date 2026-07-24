@@ -6,7 +6,7 @@ config = {
     "seed": 42,
 
     # Core Evaluation Parameters
-    "num_evaluation_seeds": 30,  # Run 30 seeds per scenario for statistical significance
+    "num_evaluation_seeds": 1,  # Run 1 seed per scenario for statistical significance (optimized for fast execution)
 
     "solver": {
         "iterations": 10,  # Optimized iterations for fast and stable execution

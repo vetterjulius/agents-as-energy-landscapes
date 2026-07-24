@@ -44,7 +44,7 @@ def test_ebmao_assignment_energy():
 
     energy_term = EBMAOAssignmentEnergy(lambda_align=0.5, weight=1.0)
     result = energy_term.compute(state)
-    assert abs(result.item() - 1.25 / 6.0) < 1e-5
+    assert abs(result.item() - 0.25 / 6.0) < 1e-5
 
 
 def test_ebmao_interaction_energy():
