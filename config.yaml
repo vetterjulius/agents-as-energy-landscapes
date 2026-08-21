@@ -4,6 +4,7 @@ model:
   dim: 32
 
   lambda_align: 0.5
+  lambda_memory: 0.5
   eta_theta: 0.1
   eta_memory: 0.05
 

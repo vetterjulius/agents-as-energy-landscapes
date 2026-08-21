@@ -1,168 +1,199 @@
 from __future__ import annotations
 
-import random
 from typing import List
 
 import torch
 
-from dynamics.theta_update import ThetaUpdater
-from dynamics.ebmao_memory_update import EBMAOMemoryUpdater
-from energy.ebmao_assignment import EBMAOAssignmentEnergy
-from energy.ebmao_cost import EBMAOCostEnergy
-from energy.ebmao_interaction import EBMAOInteractionEnergy
-from energy.registry import EnergyRegistry
-from energy.ebmao_risk import EBMAORiskEnergy
-from energy.risk import RiskPredictor
+from model.ebmao_orchestrator import EBMAOOrchestrator as CoreEBMAOOrchestrator
 from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 from state.orchestration_state import OrchestrationState
 
 
 class EBMAOOrchestrator(BaseOrchestrator):
-    """EBMAO orchestrator that builds a real orchestration state from benchmark tasks using EBMAO potentials."""
+    """Benchmark adapter around the canonical EBMAO implementation."""
 
     def __init__(self, cfg, initial_state=None, W_risk=None):
         super().__init__(cfg)
+
         self.cfg = cfg
-        m = cfg.get("model", {})
+        self.initial_state = initial_state
+        self._W_risk = W_risk
 
-        self.N = m.get("num_agents", 2)
-        self.M = m.get("num_tasks", 2)
-        self.d = m.get("dim", 8)
-
-        self.lambda_align = m.get("lambda_align", 0.5)
-        self.lambda_memory = m.get("lambda_memory", self.lambda_align)
-        self.eta_theta = m.get("eta_theta", 0.1)
-        self.eta_memory = m.get("eta_memory", 0.05)
-        self.w_risk = m.get("risk_weight", 1.0)
-        self.w_int = m.get("interaction_weight", 1.0)
-        self.w_cost = m.get("cost_weight", 1.0)
-
-        self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
-
-        self.state = initial_state.clone() if initial_state is not None else self._build_state_from_config()
-        if self.theta_mode == "dynamic" and initial_state is None:
-            self.state.Theta = torch.zeros_like(self.state.Theta)
-        self.risk_predictor = RiskPredictor(self.d, W_risk=W_risk.clone() if W_risk is not None else None, scale=m.get("risk_scale", 1.0))
-
-        self.energy_registry = EnergyRegistry()
-        self.energy_registry.add(EBMAOAssignmentEnergy(self.lambda_align, self.lambda_memory, weight=1.0))
-        self.energy_registry.add(EBMAOInteractionEnergy(weight=self.w_int))
-        self.energy_registry.add(EBMAOCostEnergy(weight=self.w_cost))
-        self.energy_registry.add(EBMAORiskEnergy(self.risk_predictor, weight=self.w_risk))
-
-        self.theta_updater = ThetaUpdater(self.eta_theta)
-        self.memory_updater = EBMAOMemoryUpdater(self.eta_memory)
+        # The actual EBMAO implementation lives in model/.
+        self.core = None
 
     def solve(self, tasks: List[Task], agents: List[Agent]) -> Assignment:
         assignment = Assignment()
+
         if not tasks or not agents:
             return assignment
 
-        self._initialize_from_tasks(tasks, agents)
-        self._apply_energy_optimization(tasks, agents)
+        state = self._build_state(tasks, agents)
+
+        self.core = CoreEBMAOOrchestrator(
+            self.cfg,
+            initial_state=state,
+            W_risk=self._W_risk,
+        )
+
+        # Run the canonical EBMAO dynamics.
+        num_steps = self.cfg.get("model", {}).get("benchmark_steps", 10)
+
+        for _ in range(num_steps):
+            self.core.step()
 
         for task_idx, task in enumerate(tasks):
-            agent_idx = int(torch.argmax(self.state.X[:, task_idx]).item())
-            agent = self._coerce_agent(agents[agent_idx])
-            assignment[task.id] = agent.id
+            agent_idx = int(torch.argmax(self.core.X[:, task_idx]).item())
+            assignment[task.id] = agents[agent_idx].id
+
         return assignment
 
     def total_energy(self):
-        total, _ = self.energy_registry.compute(self.state)
-        return total
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
 
-    def _initialize_from_tasks(self, tasks: List[Task], agents: List[Agent]) -> None:
-        task_embeddings = torch.stack([task.embedding for task in tasks], dim=0)
-        agent_embeddings = torch.stack([self._coerce_agent(agent).capability_embedding for agent in agents], dim=0)
-        self.state.c = task_embeddings
-        self.state.s = agent_embeddings
-        self.state.M = len(tasks)
-        self.state.N = len(agents)
-        self.state.d = self.state.c.shape[1]
-        self.state.kappa = torch.zeros(self.state.N, self.state.d)
-        self.state.Theta = torch.zeros(self.state.M, self.state.M)
-        self.state.C = torch.rand(self.state.M, self.state.M)
-        self.state.C.fill_diagonal_(0)
+        return self.core.total_energy()
 
-        self.state.X = torch.zeros(self.state.N, self.state.M)
+    @property
+    def state(self):
+        if self.core is None:
+            return None
+        return self.core.state
+
+    @property
+    def X(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.X
+
+    @property
+    def s(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.s
+
+    @property
+    def c(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.c
+
+    @property
+    def kappa(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.kappa
+
+    @property
+    def Theta(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.Theta
+
+    @property
+    def C(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.C
+
+    @property
+    def W_risk(self):
+        if self.core is None:
+            return self._W_risk
+        return self.core.W_risk
+
+    @property
+    def T(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.T
+
+    @property
+    def acc_rate(self):
+        if self.core is None:
+            raise RuntimeError(
+                "EBMAOOrchestrator.solve() must be called first."
+            )
+        return self.core.acc_rate
+
+    def _build_state(
+        self,
+        tasks: List[Task],
+        agents: List[Agent],
+    ) -> OrchestrationState:
+        task_embeddings = torch.stack(
+            [task.embedding for task in tasks],
+            dim=0,
+        )
+
+        agent_embeddings = torch.stack(
+            [agent.capability_embedding for agent in agents],
+            dim=0,
+        )
+
+        M = len(tasks)
+        N = len(agents)
+        d = task_embeddings.shape[1]
+
+        # Initial assignment based on capability distance.
+        X = torch.zeros(N, M)
+
         for task_idx, task in enumerate(tasks):
-            if self.theta_mode != "dynamic":
-                if task.dependencies:
-                    for dep in task.dependencies:
-                        dep_idx = next((idx for idx, candidate in enumerate(tasks) if candidate.id == dep), None)
-                        if dep_idx is not None:
-                            self.state.Theta[task_idx, dep_idx] = 1.0
-            best_agent_idx = 0
-            best_score = float("inf")
-            for agent_idx, agent in enumerate(agents):
-                agent_embedding = self._coerce_agent(agent).capability_embedding
-                score = float(torch.sum((task.embedding - agent_embedding) ** 2).item())
-                if score < best_score:
-                    best_score = score
-                    best_agent_idx = agent_idx
-            self.state.X[best_agent_idx, task_idx] = 1.0
+            distances = torch.sum(
+                (agent_embeddings - task.embedding.unsqueeze(0)) ** 2,
+                dim=1,
+            )
 
-    def _apply_energy_optimization(self, tasks: List[Task], agents: List[Agent]) -> None:
-        if self.theta_mode != "static":
-            self.theta_updater.apply(self.state)
-        self.memory_updater.apply(self.state, self.risk_predictor)
-        for _ in range(2):
-            best_X, _, improved = self._find_best_reassignment()
-            if improved:
-                self.state.X = best_X
-            if self.theta_mode != "static":
-                self.theta_updater.apply(self.state)
-            self.memory_updater.apply(self.state, self.risk_predictor)
+            agent_idx = int(torch.argmin(distances).item())
+            X[agent_idx, task_idx] = 1.0
 
-    def _find_best_reassignment(self):
-        X_orig = self.state.X.clone()
-        best_X = X_orig.clone()
-        best_E, _ = self.energy_registry.compute(self.state)
-        best_E = best_E.item()
-        improved = False
+        # Encode task dependencies in Theta.
+        Theta = torch.zeros(M, M)
 
-        for t in range(self.state.M):
-            a_curr = torch.argmax(X_orig[:, t]).item()
-            for a in range(self.state.N):
-                if a == a_curr:
-                    continue
-                X_prop = X_orig.clone()
-                X_prop[a_curr, t] = 0.0
-                X_prop[a, t] = 1.0
-                self.state.X = X_prop
-                E, _ = self.energy_registry.compute(self.state)
-                E_val = E.item()
-                if E_val < best_E - 1e-6:
-                    best_E = E_val
-                    best_X = X_prop.clone()
-                    improved = True
+        for task_idx, task in enumerate(tasks):
+            for dependency in task.dependencies:
+                dep_idx = next(
+                    (
+                        idx
+                        for idx, candidate in enumerate(tasks)
+                        if candidate.id == dependency
+                    ),
+                    None,
+                )
 
-        self.state.X = X_orig
-        return best_X, best_E, improved
+                if dep_idx is not None:
+                    Theta[task_idx, dep_idx] = 1.0
 
-    def _build_state_from_config(self) -> OrchestrationState:
-        n = self.N
-        m = self.M
-        d = self.d
-        s = torch.randn(n, d)
-        c = torch.randn(m, d)
-        kappa = torch.zeros(n, d)
-        Theta = torch.zeros(m, m)
-        C = torch.rand(m, m)
+        # Cost/coupling matrix is part of the EBMAO state.
+        C = torch.rand(M, M)
         C.fill_diagonal_(0)
-        X = torch.zeros(n, m)
-        for t in range(m):
-            a = random.randint(0, n - 1)
-            X[a, t] = 1.0
-        return OrchestrationState(X=X, s=s, c=c, kappa=kappa, Theta=Theta, C=C, N=n, M=m, d=d)
 
-    @staticmethod
-    def _coerce_agent(agent: Agent | dict):
-        if isinstance(agent, dict):
-            return type("AgentShim", (), {
-                "id": agent.get("id", "unknown"),
-                "role": agent.get("role", "unknown"),
-                "capability_embedding": torch.as_tensor(agent.get("capability_embedding", []), dtype=torch.float32),
-                "memory_state": agent.get("memory_state", {}),
-            })()
-        return agent
+        kappa = torch.zeros(N, d)
+
+        return OrchestrationState(
+            X=X,
+            s=agent_embeddings,
+            c=task_embeddings,
+            kappa=kappa,
+            Theta=Theta,
+            C=C,
+            N=N,
+            M=M,
+            d=d,
+        )
