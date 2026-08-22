@@ -241,6 +241,24 @@ class EBMAOOrchestrator:
                     improved = True
 
         self.state.X = X_orig
+
+        # Debug invariant: every task must remain assigned exactly once.
+        if not torch.allclose(
+            best_X.sum(dim=0),
+            torch.ones(self.M, dtype=best_X.dtype),
+        ):
+            raise RuntimeError(
+                "EBMAO invariant violated: best_X has invalid column sums"
+            )
+
+        if not torch.allclose(
+            self.state.X.sum(dim=0),
+            torch.ones(self.M, dtype=self.state.X.dtype),
+        ):
+            raise RuntimeError(
+                "EBMAO invariant violated: state.X has invalid column sums"
+            )
+
         return best_X, best_E, improved
 
     def _warm_start(self):

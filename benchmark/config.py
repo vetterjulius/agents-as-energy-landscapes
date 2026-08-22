@@ -15,6 +15,10 @@ config = {
         "max_temperature": 2.0,
         "target_accept_rate": 0.25
     },
+    
+    "training": {
+        "iterations": 10,
+    },
 
     "model": {
         "lambda_align": 0.5,

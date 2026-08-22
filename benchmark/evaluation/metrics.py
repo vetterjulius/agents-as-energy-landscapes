@@ -8,7 +8,14 @@ from energy.cost import CostEnergy
 from energy.risk import RiskEnergy, RiskPredictor
 from state.orchestration_state import OrchestrationState
 
-def compute_energy(problem, X):
+def compute_energy(
+    problem,
+    X,
+    interaction_weight=1.0,
+    lambda_align=0.5,
+    cost_weight=1.0,
+    risk_weight=1.0,
+):
     N = len(problem.agents)
     M = len(problem.tasks)
     d = problem.agents[0].capability_embedding.shape[0]
@@ -20,18 +27,46 @@ def compute_energy(problem, X):
         kappa=torch.zeros(N, d),
         Theta=problem.interaction_graph,
         C=problem.co_assignment_costs,
-        N=N, M=M, d=d
+        N=N,
+        M=M,
+        d=d,
     )
 
-    risk_predictor = RiskPredictor(d, W_risk=problem.risk_weights)
+    risk_predictor = RiskPredictor(
+        d,
+        W_risk=problem.risk_weights,
+    )
 
     registry = EnergyRegistry()
-    registry.add(AssignmentEnergy(lambda_align=0.5, weight=1.0))
-    registry.add(InteractionEnergy(weight=1.0))
-    registry.add(CostEnergy(weight=1.0))
-    registry.add(RiskEnergy(risk_predictor, weight=1.0))
+
+    registry.add(
+        AssignmentEnergy(
+            lambda_align=lambda_align,
+            weight=1.0,
+        )
+    )
+
+    registry.add(
+        InteractionEnergy(
+            weight=interaction_weight,
+        )
+    )
+
+    registry.add(
+        CostEnergy(
+            weight=cost_weight,
+        )
+    )
+
+    registry.add(
+        RiskEnergy(
+            risk_predictor,
+            weight=risk_weight,
+        )
+    )
 
     total, components = registry.compute(state)
+
     return total.item(), components
 
 def load_balance(X):

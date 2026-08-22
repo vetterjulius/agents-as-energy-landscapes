@@ -17,18 +17,18 @@ This report presents the rigorous, paper-ready scientific evaluation of the **En
 
 | Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Random | 3.5690 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0052 $\pm$ 0.0000 |
-| Capability Matching (Greedy) | 1.4160 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0021 $\pm$ 0.0000 |
-| GreedyLB | 1.4164 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0019 $\pm$ 0.0000 |
+| Random | 3.5690 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0004 $\pm$ 0.0000 |
+| Capability Matching (Greedy) | 1.4160 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0006 $\pm$ 0.0000 |
+| GreedyLB | 1.4164 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0029 $\pm$ 0.0000 |
 | RuleBased | 3.3115 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
-| Beam Search | 1.4133 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1058 $\pm$ 0.0000 |
-| Tabu Search | 1.4133 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.6134 $\pm$ 0.0000 |
-| Energy (Pure Greedy) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1438 $\pm$ 0.0000 |
-| Energy (Pure SA) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.4608 $\pm$ 0.0000 |
-| Energy (Hybrid) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 3.0536 $\pm$ 0.0000 |
-| EBMAO (Pure Greedy) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.2924 $\pm$ 0.0000 |
-| EBMAO (Pure SA) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 3.1391 $\pm$ 0.0000 |
-| EBMAO (Hybrid) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 3.8138 $\pm$ 0.0000 |
+| Beam Search | 1.4133 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1494 $\pm$ 0.0000 |
+| Tabu Search | 1.4133 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.7269 $\pm$ 0.0000 |
+| Energy (Pure Greedy) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1594 $\pm$ 0.0000 |
+| Energy (Pure SA) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 3.3466 $\pm$ 0.0000 |
+| Energy (Hybrid) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.8196 $\pm$ 0.0000 |
+| EBMAO (Pure Greedy) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1364 $\pm$ 0.0000 |
+| EBMAO (Pure SA) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.6769 $\pm$ 0.0000 |
+| EBMAO (Hybrid) | 1.4137 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 4.9086 $\pm$ 0.0000 |
 
 #### Emergent Behavior Analytics
 
@@ -67,18 +67,18 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 | Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Random | 3.4090 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0003 $\pm$ 0.0000 |
-| Capability Matching (Greedy) | 1.4760 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 | 0.0010 $\pm$ 0.0000 |
-| GreedyLB | 1.4764 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 | 0.0015 $\pm$ 0.0000 |
-| RuleBased | 3.2715 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
-| Beam Search | 1.3586 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1111 $\pm$ 0.0000 |
-| Tabu Search | 1.3180 $\pm$ 0.0000 | 1.4142 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.6266 $\pm$ 0.0000 |
-| Energy (Pure Greedy) | 1.3184 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.2266 $\pm$ 0.0000 |
-| Energy (Pure SA) | 1.3184 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.2200 $\pm$ 0.0000 |
-| Energy (Hybrid) | 1.3184 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.6401 $\pm$ 0.0000 |
-| EBMAO (Pure Greedy) | 1.3593 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.2803 $\pm$ 0.0000 |
-| EBMAO (Pure SA) | 1.3388 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 2.6985 $\pm$ 0.0000 |
-| EBMAO (Hybrid) | 1.3793 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 7.6048 $\pm$ 0.0000 |
+| Random | 3.4890 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0003 $\pm$ 0.0000 |
+| Capability Matching (Greedy) | 1.4760 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 | 0.0008 $\pm$ 0.0000 |
+| GreedyLB | 1.4764 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 | 0.0018 $\pm$ 0.0000 |
+| RuleBased | 3.2915 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
+| Beam Search | 1.4190 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1787 $\pm$ 0.0000 |
+| Tabu Search | 1.3980 $\pm$ 0.0000 | 1.4142 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.9875 $\pm$ 0.0000 |
+| Energy (Pure Greedy) | 1.3993 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3358 $\pm$ 0.0000 |
+| Energy (Pure SA) | 1.3988 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 4.4128 $\pm$ 0.0000 |
+| Energy (Hybrid) | 1.3988 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 5.1727 $\pm$ 0.0000 |
+| EBMAO (Pure Greedy) | 1.3993 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.3120 $\pm$ 0.0000 |
+| EBMAO (Pure SA) | 1.3988 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 3.0381 $\pm$ 0.0000 |
+| EBMAO (Hybrid) | 1.4193 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 4.4817 $\pm$ 0.0000 |
 
 #### Emergent Behavior Analytics
 
@@ -88,11 +88,11 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 | Capability Matching (Greedy) | 0.3587 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 10.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 |
 | GreedyLB | 0.3833 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 10.00 $\pm$ 0.00 | 2.00 $\pm$ 0.00 |
 | RuleBased | -0.1780 $\pm$ 0.0000 | 0.2000 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Beam Search | 0.4014 $\pm$ 0.0000 | 0.6000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Beam Search | 0.4086 $\pm$ 0.0000 | 0.4000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | Tabu Search | 0.3489 $\pm$ 0.0000 | 0.8000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Pure Greedy) | 0.3736 $\pm$ 0.0000 | 0.8000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Pure SA) | 0.3736 $\pm$ 0.0000 | 0.8000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Hybrid) | 0.3736 $\pm$ 0.0000 | 0.8000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Pure Greedy) | 0.3688 $\pm$ 0.0000 | 0.4000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Pure SA) | 0.3808 $\pm$ 0.0000 | 0.6000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Hybrid) | 0.3808 $\pm$ 0.0000 | 0.6000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Pure Greedy) | 0.3688 $\pm$ 0.0000 | 0.4000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Pure SA) | 0.3808 $\pm$ 0.0000 | 0.6000 $\pm$ 0.0000 | 4.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Hybrid) | 0.4333 $\pm$ 0.0000 | 0.4000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
@@ -101,13 +101,13 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the best baseline (lowest mean energy among non-Energy methods).
 
-**Identified Best Baseline**: *Tabu Search* (Mean Energy: 1.3180)
+**Identified Best Baseline**: *Tabu Search* (Mean Energy: 1.3980)
 
 | Energy Solver | Welch's t-test p-value | Mann-Whitney U p-value | Solver 95% Confidence Interval | Statistically Significant (p < 0.05)? |
 | :--- | :---: | :---: | :---: | :---: |
-| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.3184, 1.3184] | **No** |
-| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.3184, 1.3184] | **No** |
-| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.3184, 1.3184] | **No** |
+| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.3993, 1.3993] | **No** |
+| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.3988, 1.3988] | **No** |
+| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.3988, 1.3988] | **No** |
 
 ---
 
@@ -117,18 +117,18 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 | Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Random | 3.7514 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 13.00 $\pm$ 0.00 | 30.00 $\pm$ 0.00 | 0.0003 $\pm$ 0.0000 |
-| Capability Matching (Greedy) | 1.5592 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 14.00 $\pm$ 0.00 | 26.00 $\pm$ 0.00 | 0.0006 $\pm$ 0.0000 |
-| GreedyLB | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.0016 $\pm$ 0.0000 |
-| RuleBased | 3.4327 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 9.00 $\pm$ 0.00 | 20.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
-| Beam Search | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1100 $\pm$ 0.0000 |
-| Tabu Search | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.6221 $\pm$ 0.0000 |
-| Energy (Pure Greedy) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1055 $\pm$ 0.0000 |
-| Energy (Pure SA) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 2.1811 $\pm$ 0.0000 |
-| Energy (Hybrid) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 2.3927 $\pm$ 0.0000 |
-| EBMAO (Pure Greedy) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1793 $\pm$ 0.0000 |
-| EBMAO (Pure SA) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 6.1067 $\pm$ 0.0000 |
-| EBMAO (Hybrid) | 1.5336 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 5.8713 $\pm$ 0.0000 |
+| Random | 3.7532 $\pm$ 0.0000 | 1.5811 $\pm$ 0.0000 | 13.00 $\pm$ 0.00 | 30.00 $\pm$ 0.00 | 0.0003 $\pm$ 0.0000 |
+| Capability Matching (Greedy) | 1.5582 $\pm$ 0.0000 | 1.2247 $\pm$ 0.0000 | 14.00 $\pm$ 0.00 | 26.00 $\pm$ 0.00 | 0.0007 $\pm$ 0.0000 |
+| GreedyLB | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.0017 $\pm$ 0.0000 |
+| RuleBased | 3.4309 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 9.00 $\pm$ 0.00 | 20.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
+| Beam Search | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1781 $\pm$ 0.0000 |
+| Tabu Search | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.9299 $\pm$ 0.0000 |
+| Energy (Pure Greedy) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1584 $\pm$ 0.0000 |
+| Energy (Pure SA) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 3.2427 $\pm$ 0.0000 |
+| Energy (Hybrid) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 3.6126 $\pm$ 0.0000 |
+| EBMAO (Pure Greedy) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 0.1300 $\pm$ 0.0000 |
+| EBMAO (Pure SA) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 2.8817 $\pm$ 0.0000 |
+| EBMAO (Hybrid) | 1.5329 $\pm$ 0.0000 | 0.7071 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 22.00 $\pm$ 0.00 | 3.5307 $\pm$ 0.0000 |
 
 #### Emergent Behavior Analytics
 
@@ -151,13 +151,13 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the best baseline (lowest mean energy among non-Energy methods).
 
-**Identified Best Baseline**: *GreedyLB* (Mean Energy: 1.5336)
+**Identified Best Baseline**: *GreedyLB* (Mean Energy: 1.5329)
 
 | Energy Solver | Welch's t-test p-value | Mann-Whitney U p-value | Solver 95% Confidence Interval | Statistically Significant (p < 0.05)? |
 | :--- | :---: | :---: | :---: | :---: |
-| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.5336, 1.5336] | **No** |
-| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.5336, 1.5336] | **No** |
-| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.5336, 1.5336] | **No** |
+| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.5329, 1.5329] | **No** |
+| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.5329, 1.5329] | **No** |
+| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.5329, 1.5329] | **No** |
 
 ---
 
@@ -167,18 +167,18 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 | Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Random | 4.0217 $\pm$ 0.0000 | 1.7593 $\pm$ 0.0000 | 103.00 $\pm$ 0.00 | 210.00 $\pm$ 0.00 | 0.0012 $\pm$ 0.0000 |
-| Capability Matching (Greedy) | 1.2097 $\pm$ 0.0000 | 2.6367 $\pm$ 0.0000 | 140.00 $\pm$ 0.00 | 264.00 $\pm$ 0.00 | 0.0026 $\pm$ 0.0000 |
-| GreedyLB | 1.2456 $\pm$ 0.0000 | 1.3973 $\pm$ 0.0000 | 98.00 $\pm$ 0.00 | 194.00 $\pm$ 0.00 | 0.0091 $\pm$ 0.0000 |
-| RuleBased | 4.0273 $\pm$ 0.0000 | 0.4880 $\pm$ 0.0000 | 87.00 $\pm$ 0.00 | 170.00 $\pm$ 0.00 | 0.0010 $\pm$ 0.0000 |
-| Beam Search | 1.1774 $\pm$ 0.0000 | 2.0587 $\pm$ 0.0000 | 122.00 $\pm$ 0.00 | 226.00 $\pm$ 0.00 | 3.3209 $\pm$ 0.0000 |
-| Tabu Search | 2.1154 $\pm$ 0.0000 | 2.0587 $\pm$ 0.0000 | 120.00 $\pm$ 0.00 | 226.00 $\pm$ 0.00 | 21.0036 $\pm$ 0.0000 |
-| Energy (Pure Greedy) | 1.1646 $\pm$ 0.0000 | 1.6762 $\pm$ 0.0000 | 113.00 $\pm$ 0.00 | 206.00 $\pm$ 0.00 | 7.9111 $\pm$ 0.0000 |
-| Energy (Pure SA) | 1.5684 $\pm$ 0.0000 | 1.7995 $\pm$ 0.0000 | 107.00 $\pm$ 0.00 | 212.00 $\pm$ 0.00 | 9.6503 $\pm$ 0.0000 |
-| Energy (Hybrid) | 1.1676 $\pm$ 0.0000 | 1.9881 $\pm$ 0.0000 | 122.00 $\pm$ 0.00 | 222.00 $\pm$ 0.00 | 42.4159 $\pm$ 0.0000 |
-| EBMAO (Pure Greedy) | 1.1768 $\pm$ 0.0000 | 1.7995 $\pm$ 0.0000 | 110.00 $\pm$ 0.00 | 212.00 $\pm$ 0.00 | 9.6085 $\pm$ 0.0000 |
-| EBMAO (Pure SA) | 1.4368 $\pm$ 0.0000 | 1.7182 $\pm$ 0.0000 | 97.00 $\pm$ 0.00 | 208.00 $\pm$ 0.00 | 12.1631 $\pm$ 0.0000 |
-| EBMAO (Hybrid) | 1.1768 $\pm$ 0.0000 | 1.7995 $\pm$ 0.0000 | 110.00 $\pm$ 0.00 | 212.00 $\pm$ 0.00 | 34.1171 $\pm$ 0.0000 |
+| Random | 4.0224 $\pm$ 0.0000 | 1.7593 $\pm$ 0.0000 | 103.00 $\pm$ 0.00 | 210.00 $\pm$ 0.00 | 0.0011 $\pm$ 0.0000 |
+| Capability Matching (Greedy) | 1.2054 $\pm$ 0.0000 | 2.6367 $\pm$ 0.0000 | 140.00 $\pm$ 0.00 | 264.00 $\pm$ 0.00 | 0.0030 $\pm$ 0.0000 |
+| GreedyLB | 1.2474 $\pm$ 0.0000 | 1.3973 $\pm$ 0.0000 | 98.00 $\pm$ 0.00 | 194.00 $\pm$ 0.00 | 0.0104 $\pm$ 0.0000 |
+| RuleBased | 4.0220 $\pm$ 0.0000 | 0.4880 $\pm$ 0.0000 | 87.00 $\pm$ 0.00 | 170.00 $\pm$ 0.00 | 0.0016 $\pm$ 0.0000 |
+| Beam Search | 1.1727 $\pm$ 0.0000 | 2.1931 $\pm$ 0.0000 | 126.00 $\pm$ 0.00 | 234.00 $\pm$ 0.00 | 3.1158 $\pm$ 0.0000 |
+| Tabu Search | 2.1113 $\pm$ 0.0000 | 2.1269 $\pm$ 0.0000 | 116.00 $\pm$ 0.00 | 230.00 $\pm$ 0.00 | 24.8405 $\pm$ 0.0000 |
+| Energy (Pure Greedy) | 1.1605 $\pm$ 0.0000 | 1.6762 $\pm$ 0.0000 | 109.00 $\pm$ 0.00 | 206.00 $\pm$ 0.00 | 13.4724 $\pm$ 0.0000 |
+| Energy (Pure SA) | 1.5787 $\pm$ 0.0000 | 2.0237 $\pm$ 0.0000 | 111.00 $\pm$ 0.00 | 224.00 $\pm$ 0.00 | 21.5943 $\pm$ 0.0000 |
+| Energy (Hybrid) | 1.1605 $\pm$ 0.0000 | 1.6762 $\pm$ 0.0000 | 109.00 $\pm$ 0.00 | 206.00 $\pm$ 0.00 | 74.8983 $\pm$ 0.0000 |
+| EBMAO (Pure Greedy) | 1.1619 $\pm$ 0.0000 | 1.7995 $\pm$ 0.0000 | 110.00 $\pm$ 0.00 | 212.00 $\pm$ 0.00 | 12.2641 $\pm$ 0.0000 |
+| EBMAO (Pure SA) | 1.4214 $\pm$ 0.0000 | 1.9149 $\pm$ 0.0000 | 105.00 $\pm$ 0.00 | 218.00 $\pm$ 0.00 | 18.5970 $\pm$ 0.0000 |
+| EBMAO (Hybrid) | 1.1619 $\pm$ 0.0000 | 1.7995 $\pm$ 0.0000 | 110.00 $\pm$ 0.00 | 212.00 $\pm$ 0.00 | 51.3217 $\pm$ 0.0000 |
 
 #### Emergent Behavior Analytics
 
@@ -188,26 +188,26 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 | Capability Matching (Greedy) | 0.5503 $\pm$ 0.0000 | 0.1140 $\pm$ 0.0000 | 882.94 $\pm$ 0.00 | 264.00 $\pm$ 0.00 |
 | GreedyLB | 0.5474 $\pm$ 0.0000 | 0.0866 $\pm$ 0.0000 | 910.27 $\pm$ 0.00 | 194.00 $\pm$ 0.00 |
 | RuleBased | -0.0497 $\pm$ 0.0000 | 0.0672 $\pm$ 0.0000 | 929.59 $\pm$ 0.00 | 170.00 $\pm$ 0.00 |
-| Beam Search | 0.5862 $\pm$ 0.0000 | 0.0965 $\pm$ 0.0000 | 900.46 $\pm$ 0.00 | 226.00 $\pm$ 0.00 |
-| Tabu Search | 0.2950 $\pm$ 0.0000 | 0.0970 $\pm$ 0.0000 | 899.93 $\pm$ 0.00 | 226.00 $\pm$ 0.00 |
-| Energy (Pure Greedy) | 0.5844 $\pm$ 0.0000 | 0.0985 $\pm$ 0.0000 | 898.46 $\pm$ 0.00 | 206.00 $\pm$ 0.00 |
-| Energy (Pure SA) | 0.4471 $\pm$ 0.0000 | 0.0854 $\pm$ 0.0000 | 911.49 $\pm$ 0.00 | 212.00 $\pm$ 0.00 |
-| Energy (Hybrid) | 0.5907 $\pm$ 0.0000 | 0.1012 $\pm$ 0.0000 | 895.74 $\pm$ 0.00 | 222.00 $\pm$ 0.00 |
+| Beam Search | 0.5813 $\pm$ 0.0000 | 0.1020 $\pm$ 0.0000 | 894.92 $\pm$ 0.00 | 234.00 $\pm$ 0.00 |
+| Tabu Search | 0.2949 $\pm$ 0.0000 | 0.0858 $\pm$ 0.0000 | 911.07 $\pm$ 0.00 | 230.00 $\pm$ 0.00 |
+| Energy (Pure Greedy) | 0.5900 $\pm$ 0.0000 | 0.0905 $\pm$ 0.0000 | 906.44 $\pm$ 0.00 | 206.00 $\pm$ 0.00 |
+| Energy (Pure SA) | 0.4500 $\pm$ 0.0000 | 0.0932 $\pm$ 0.0000 | 903.70 $\pm$ 0.00 | 224.00 $\pm$ 0.00 |
+| Energy (Hybrid) | 0.5900 $\pm$ 0.0000 | 0.0905 $\pm$ 0.0000 | 906.44 $\pm$ 0.00 | 206.00 $\pm$ 0.00 |
 | EBMAO (Pure Greedy) | 0.5904 $\pm$ 0.0000 | 0.0909 $\pm$ 0.0000 | 906.01 $\pm$ 0.00 | 212.00 $\pm$ 0.00 |
-| EBMAO (Pure SA) | 0.4848 $\pm$ 0.0000 | 0.0782 $\pm$ 0.0000 | 918.68 $\pm$ 0.00 | 208.00 $\pm$ 0.00 |
+| EBMAO (Pure SA) | 0.4888 $\pm$ 0.0000 | 0.0878 $\pm$ 0.0000 | 909.09 $\pm$ 0.00 | 218.00 $\pm$ 0.00 |
 | EBMAO (Hybrid) | 0.5904 $\pm$ 0.0000 | 0.0909 $\pm$ 0.0000 | 906.01 $\pm$ 0.00 | 212.00 $\pm$ 0.00 |
 
 #### Statistical Significance vs. Best Baseline
 
 We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the best baseline (lowest mean energy among non-Energy methods).
 
-**Identified Best Baseline**: *Beam Search* (Mean Energy: 1.1774)
+**Identified Best Baseline**: *Beam Search* (Mean Energy: 1.1727)
 
 | Energy Solver | Welch's t-test p-value | Mann-Whitney U p-value | Solver 95% Confidence Interval | Statistically Significant (p < 0.05)? |
 | :--- | :---: | :---: | :---: | :---: |
-| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.1646, 1.1646] | **No** |
-| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.5684, 1.5684] | **No** |
-| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.1676, 1.1676] | **No** |
+| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [1.1605, 1.1605] | **No** |
+| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [1.5787, 1.5787] | **No** |
+| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [1.1605, 1.1605] | **No** |
 
 ---
 
@@ -217,18 +217,18 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 | Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Random | 2.7588 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 4.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
-| Capability Matching (Greedy) | 3.3977 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 | 0.0004 $\pm$ 0.0000 |
-| GreedyLB | 3.3977 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 | 0.0010 $\pm$ 0.0000 |
+| Random | 2.8699 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 2.00 $\pm$ 0.00 | 4.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
+| Capability Matching (Greedy) | 3.3977 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 | 0.0020 $\pm$ 0.0000 |
+| GreedyLB | 3.3977 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 | 0.0029 $\pm$ 0.0000 |
 | RuleBased | 3.3977 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 0.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 | 0.0002 $\pm$ 0.0000 |
-| Beam Search | -0.2690 $\pm$ 0.0000 | 1.7321 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0403 $\pm$ 0.0000 |
-| Tabu Search | -0.2690 $\pm$ 0.0000 | 1.7321 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1748 $\pm$ 0.0000 |
-| Energy (Pure Greedy) | -0.2690 $\pm$ 0.0000 | 1.7321 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0383 $\pm$ 0.0000 |
-| Energy (Pure SA) | -0.2690 $\pm$ 0.0000 | 1.7321 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.9028 $\pm$ 0.0000 |
-| Energy (Hybrid) | -0.2690 $\pm$ 0.0000 | 1.7321 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.9592 $\pm$ 0.0000 |
-| EBMAO (Pure Greedy) | -0.1856 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0476 $\pm$ 0.0000 |
-| EBMAO (Pure SA) | -0.1856 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.0419 $\pm$ 0.0000 |
-| EBMAO (Hybrid) | -0.1856 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.6377 $\pm$ 0.0000 |
+| Beam Search | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1490 $\pm$ 0.0000 |
+| Tabu Search | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.2775 $\pm$ 0.0000 |
+| Energy (Pure Greedy) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.1137 $\pm$ 0.0000 |
+| Energy (Pure SA) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.8473 $\pm$ 0.0000 |
+| Energy (Hybrid) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.7998 $\pm$ 0.0000 |
+| EBMAO (Pure Greedy) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 0.0751 $\pm$ 0.0000 |
+| EBMAO (Pure SA) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.5445 $\pm$ 0.0000 |
+| EBMAO (Hybrid) | 0.1477 $\pm$ 0.0000 | 1.0000 $\pm$ 0.0000 | 6.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 | 1.6910 $\pm$ 0.0000 |
 
 #### Emergent Behavior Analytics
 
@@ -238,11 +238,11 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 | Capability Matching (Greedy) | 1.0000 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 24.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 |
 | GreedyLB | 1.0000 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 24.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 |
 | RuleBased | 1.0000 $\pm$ 0.0000 | 0.0000 $\pm$ 0.0000 | 24.00 $\pm$ 0.00 | 6.00 $\pm$ 0.00 |
-| Beam Search | 0.3333 $\pm$ 0.0000 | 0.6667 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Tabu Search | 0.3333 $\pm$ 0.0000 | 0.6667 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Pure Greedy) | 0.3333 $\pm$ 0.0000 | 0.6667 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Pure SA) | 0.3333 $\pm$ 0.0000 | 0.6667 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
-| Energy (Hybrid) | 0.3333 $\pm$ 0.0000 | 0.6667 $\pm$ 0.0000 | 8.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Beam Search | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Tabu Search | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Pure Greedy) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Pure SA) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
+| Energy (Hybrid) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Pure Greedy) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Pure SA) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
 | EBMAO (Hybrid) | 0.5000 $\pm$ 0.0000 | 0.5000 $\pm$ 0.0000 | 12.00 $\pm$ 0.00 | 0.00 $\pm$ 0.00 |
@@ -251,13 +251,13 @@ We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the
 
 We compare the primary Energy solvers (Pure SA, Pure Greedy, Hybrid) against the best baseline (lowest mean energy among non-Energy methods).
 
-**Identified Best Baseline**: *Beam Search* (Mean Energy: -0.2690)
+**Identified Best Baseline**: *Beam Search* (Mean Energy: 0.1477)
 
 | Energy Solver | Welch's t-test p-value | Mann-Whitney U p-value | Solver 95% Confidence Interval | Statistically Significant (p < 0.05)? |
 | :--- | :---: | :---: | :---: | :---: |
-| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [-0.2690, -0.2690] | **No** |
-| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [-0.2690, -0.2690] | **No** |
-| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [-0.2690, -0.2690] | **No** |
+| Energy (Pure Greedy) | 1.00e+00 | 1.00e+00 | [0.1477, 0.1477] | **No** |
+| Energy (Pure SA) | 1.00e+00 | 1.00e+00 | [0.1477, 0.1477] | **No** |
+| Energy (Hybrid) | 1.00e+00 | 1.00e+00 | [0.1477, 0.1477] | **No** |
 
 ---
 
@@ -277,10 +277,10 @@ In this scenario, agent expertise changes abruptly at episode 25 (e.g., Agent 0 
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 1.7528 $\pm$ 0.3162 | 1.6793 $\pm$ 0.6227 | 8.04 $\pm$ 4.11 | 4.56 $\pm$ 3.05 | 0.4140 $\pm$ 0.0680 | 7.4600 $\pm$ 1.7637 |
-| EBMAO (kappa-only) | 1.7523 $\pm$ 0.3152 | 1.7087 $\pm$ 0.6391 | 8.24 $\pm$ 4.05 | 4.64 $\pm$ 3.14 | 0.4144 $\pm$ 0.0672 | 7.5200 $\pm$ 1.7407 |
-| EBMAO (theta-only) | 1.7636 $\pm$ 0.3180 | 1.5626 $\pm$ 0.5788 | 6.68 $\pm$ 3.01 | 4.24 $\pm$ 3.09 | 0.4146 $\pm$ 0.0691 | 7.5000 $\pm$ 1.7985 |
-| Full EBMAO | 1.7652 $\pm$ 0.3177 | 1.5320 $\pm$ 0.6001 | 6.76 $\pm$ 3.18 | 4.24 $\pm$ 3.17 | 0.4198 $\pm$ 0.0657 | 7.4400 $\pm$ 1.7280 |
+| Static Energy | 1.7914 $\pm$ 0.3143 | 1.6793 $\pm$ 0.6227 | 8.04 $\pm$ 4.11 | 4.56 $\pm$ 3.05 | 0.4140 $\pm$ 0.0680 | 7.4600 $\pm$ 1.7637 |
+| EBMAO (kappa-only) | 1.7922 $\pm$ 0.3141 | 1.7087 $\pm$ 0.6391 | 8.24 $\pm$ 4.05 | 4.64 $\pm$ 3.14 | 0.4144 $\pm$ 0.0672 | 7.5200 $\pm$ 1.7407 |
+| EBMAO (theta-only) | 1.7944 $\pm$ 0.3158 | 1.5626 $\pm$ 0.5788 | 6.68 $\pm$ 3.01 | 4.24 $\pm$ 3.09 | 0.4146 $\pm$ 0.0691 | 7.5000 $\pm$ 1.7985 |
+| Full EBMAO | 1.7964 $\pm$ 0.3156 | 1.5320 $\pm$ 0.6001 | 6.76 $\pm$ 3.18 | 4.24 $\pm$ 3.17 | 0.4198 $\pm$ 0.0657 | 7.4400 $\pm$ 1.7280 |
 
 #### Scenario: Task Shift
 
@@ -290,10 +290,10 @@ The task distribution shifts abruptly at episode 25, requiring agents to perform
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 2.5685 $\pm$ 1.0032 | 2.4873 $\pm$ 0.8825 | 12.44 $\pm$ 6.38 | 7.64 $\pm$ 4.46 | 0.4515 $\pm$ 0.0650 | 5.8600 $\pm$ 2.1947 |
-| EBMAO (kappa-only) | 2.5693 $\pm$ 1.0048 | 2.5108 $\pm$ 0.9013 | 12.56 $\pm$ 6.25 | 7.56 $\pm$ 4.39 | 0.4511 $\pm$ 0.0647 | 5.9800 $\pm$ 2.1617 |
-| EBMAO (theta-only) | 2.5748 $\pm$ 1.0026 | 2.4037 $\pm$ 0.9048 | 11.52 $\pm$ 6.55 | 7.24 $\pm$ 4.44 | 0.4517 $\pm$ 0.0645 | 5.9200 $\pm$ 2.1650 |
-| Full EBMAO | 2.5776 $\pm$ 1.0018 | 2.3820 $\pm$ 0.9401 | 11.44 $\pm$ 6.79 | 7.16 $\pm$ 4.54 | 0.4545 $\pm$ 0.0614 | 5.9000 $\pm$ 2.1213 |
+| Static Energy | 2.6253 $\pm$ 1.0190 | 2.4873 $\pm$ 0.8825 | 12.44 $\pm$ 6.38 | 7.64 $\pm$ 4.46 | 0.4515 $\pm$ 0.0650 | 5.8600 $\pm$ 2.1947 |
+| EBMAO (kappa-only) | 2.6267 $\pm$ 1.0202 | 2.5108 $\pm$ 0.9013 | 12.56 $\pm$ 6.25 | 7.56 $\pm$ 4.39 | 0.4511 $\pm$ 0.0647 | 5.9800 $\pm$ 2.1617 |
+| EBMAO (theta-only) | 2.6270 $\pm$ 1.0192 | 2.4037 $\pm$ 0.9048 | 11.52 $\pm$ 6.55 | 7.24 $\pm$ 4.44 | 0.4517 $\pm$ 0.0645 | 5.9200 $\pm$ 2.1650 |
+| Full EBMAO | 2.6293 $\pm$ 1.0190 | 2.3820 $\pm$ 0.9401 | 11.44 $\pm$ 6.79 | 7.16 $\pm$ 4.54 | 0.4545 $\pm$ 0.0614 | 5.9000 $\pm$ 2.1213 |
 
 #### Scenario: Dependency Change
 
@@ -303,10 +303,10 @@ Task dependencies (Theta) undergo a sudden structural change at episode 25. This
 
 | Configuration | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Specialization Degree | Reconfiguration Cost |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 1.6976 $\pm$ 0.3119 | 1.7410 $\pm$ 0.6299 | 5.16 $\pm$ 3.11 | 0.00 $\pm$ 0.00 | 0.4116 $\pm$ 0.0704 | 7.4200 $\pm$ 1.8526 |
-| EBMAO (kappa-only) | 1.6998 $\pm$ 0.3129 | 1.7040 $\pm$ 0.6031 | 5.16 $\pm$ 2.97 | 0.00 $\pm$ 0.00 | 0.4146 $\pm$ 0.0690 | 7.4400 $\pm$ 1.8088 |
-| EBMAO (theta-only) | 1.7086 $\pm$ 0.3154 | 1.6699 $\pm$ 0.5359 | 4.40 $\pm$ 2.62 | 0.00 $\pm$ 0.00 | 0.4142 $\pm$ 0.0682 | 7.3600 $\pm$ 1.8490 |
-| Full EBMAO | 1.7117 $\pm$ 0.3154 | 1.6275 $\pm$ 0.5813 | 4.36 $\pm$ 2.67 | 0.00 $\pm$ 0.00 | 0.4181 $\pm$ 0.0674 | 7.3800 $\pm$ 1.8394 |
+| Static Energy | 1.7492 $\pm$ 0.3132 | 1.7410 $\pm$ 0.6299 | 5.16 $\pm$ 3.11 | 0.00 $\pm$ 0.00 | 0.4116 $\pm$ 0.0704 | 7.4200 $\pm$ 1.8526 |
+| EBMAO (kappa-only) | 1.7514 $\pm$ 0.3131 | 1.7040 $\pm$ 0.6031 | 5.16 $\pm$ 2.97 | 0.00 $\pm$ 0.00 | 0.4146 $\pm$ 0.0690 | 7.4400 $\pm$ 1.8088 |
+| EBMAO (theta-only) | 1.7526 $\pm$ 0.3145 | 1.6699 $\pm$ 0.5359 | 4.40 $\pm$ 2.62 | 0.00 $\pm$ 0.00 | 0.4142 $\pm$ 0.0682 | 7.3600 $\pm$ 1.8490 |
+| Full EBMAO | 1.7553 $\pm$ 0.3146 | 1.6275 $\pm$ 0.5813 | 4.36 $\pm$ 2.67 | 0.00 $\pm$ 0.00 | 0.4181 $\pm$ 0.0674 | 7.3800 $\pm$ 1.8394 |
 
 #### Scenario: Emergent Specialization
 
@@ -338,10 +338,10 @@ Evaluates resilience under complex compound perturbations. An agent fails (leave
 
 | Configuration | Recovery Time (episodes) | Cumulative Regret | Late Stability (reconfig) | Late Convergence (std) | Performance Drop |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Static Energy | 2.25 | 16.43 | 6.6250 | 0.3556 | 1.1680 |
-| EBMAO (kappa-only) | 0.75 | 16.51 | 6.8500 | 0.3553 | 1.1705 |
-| EBMAO (theta-only) | 2.25 | 16.55 | 6.5500 | 0.3566 | 1.1750 |
-| Full EBMAO | 0.75 | 16.61 | 6.8250 | 0.3547 | 1.1596 |
+| Static Energy | 2.75 | 16.92 | 6.6250 | 0.3500 | 1.1808 |
+| EBMAO (kappa-only) | 1.25 | 16.98 | 6.8500 | 0.3501 | 1.1833 |
+| EBMAO (theta-only) | 3.50 | 16.96 | 6.5500 | 0.3506 | 1.1824 |
+| Full EBMAO | 1.75 | 17.02 | 6.8250 | 0.3494 | 1.1732 |
 
 ### Scientific Analysis & Discussion
 - **The Power of Adaptive Landscape**: Static energy optimization has no memory and no structural learning. When agent expertise drifts or task distributions shift, it suffers massive energy spikes and takes extremely long to re-converge, incurring high cumulative regret. In contrast, **Full EBMAO achieves the fastest recovery times** and slashes cumulative regret by more than 70%.
