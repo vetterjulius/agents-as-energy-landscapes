@@ -156,31 +156,19 @@ def run_experiment(
 
     return all_results
 
-def run_benchmark():
+def run_benchmark(quick: bool = False):
     print("Starting Energy-Based Orchestration Benchmark (EOB)...")
-    print("DEBUG config keys:", config.keys())
-    print("DEBUG solver config:", config.get("solver"))
-    print("DEBUG model config:", config.get("model"))
-
     if "model" not in config:
         config["model"] = {}
-    """
-    config["model"].update({
-        "warm_start_steps": 0,
-        "local_refine_steps": 0,
-        "proposal_candidates": 2,
-        "proposal_task_sample": 2,
-        "agent_sample_size": 2,
-        "block_move_size": 1,
-        "hybrid_cleanup_prob": 0.0
-    })
-    """
-    
 
     # Load base seed
     base_seed = config.get("seed", 42)
     num_seeds = config.get("num_evaluation_seeds", 30)
-    print(f"Configured to run {num_seeds} seeds per scenario.")
+    if quick:
+        num_seeds = 1
+        print("QUICK MODE: using 1 evaluation seed.")
+    else:
+        print(f"Configured to run {num_seeds} seeds per scenario.")
 
     # Instantiate Scenarios (using config dimensions)
     dim = config.get("dim", 8)
