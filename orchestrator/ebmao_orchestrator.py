@@ -1,52 +1,34 @@
 from __future__ import annotations
 
-from typing import List
-
 import torch
 
+from benchmark.scenarios.base import ProblemInstance
 from model.ebmao_orchestrator import EBMAOOrchestrator as CoreEBMAOOrchestrator
-from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 from state.orchestration_state import OrchestrationState
 
 
-class EBMAOOrchestrator(BaseOrchestrator):
+class EBMAOOrchestrator:
     """Benchmark adapter around the canonical EBMAO implementation."""
 
-    def __init__(self, cfg, initial_state=None, W_risk=None):
-        super().__init__(cfg)
-
+    def __init__(self, cfg):
         self.cfg = cfg
-        self.initial_state = initial_state
-        self._W_risk = W_risk
-
-        # The actual EBMAO implementation lives in model/.
         self.core = None
 
-    def solve(self, tasks: List[Task], agents: List[Agent]) -> Assignment:
-        assignment = Assignment()
-
-        if not tasks or not agents:
-            return assignment
-
-        state = self._build_state(tasks, agents)
+    def solve(self, problem: ProblemInstance) -> torch.Tensor:
+        state = self._build_state(problem)
 
         self.core = CoreEBMAOOrchestrator(
             self.cfg,
             initial_state=state,
-            W_risk=self._W_risk,
+            W_risk=problem.risk_weights,
         )
 
-        # Run the canonical EBMAO dynamics.
-        num_steps = self.cfg.get("model", {}).get("benchmark_steps", 10)
+        num_steps = self.cfg.get("solver", {}).get("iterations", 100)
 
         for _ in range(num_steps):
             self.core.step()
 
-        for task_idx, task in enumerate(tasks):
-            agent_idx = int(torch.argmax(self.core.X[:, task_idx]).item())
-            assignment[task.id] = agents[agent_idx].id
-
-        return assignment
+        return self.core.X
 
     def total_energy(self):
         if self.core is None:
@@ -113,7 +95,7 @@ class EBMAOOrchestrator(BaseOrchestrator):
     @property
     def W_risk(self):
         if self.core is None:
-            return self._W_risk
+            return None
         return self.core.W_risk
 
     @property
@@ -134,55 +116,37 @@ class EBMAOOrchestrator(BaseOrchestrator):
 
     def _build_state(
         self,
-        tasks: List[Task],
-        agents: List[Agent],
+        problem: ProblemInstance,
     ) -> OrchestrationState:
+
         task_embeddings = torch.stack(
-            [task.embedding for task in tasks],
+            [task.embedding for task in problem.tasks],
             dim=0,
         )
 
         agent_embeddings = torch.stack(
-            [agent.capability_embedding for agent in agents],
+            [agent.capability_embedding for agent in problem.agents],
             dim=0,
         )
 
-        M = len(tasks)
-        N = len(agents)
+        N = len(problem.agents)
+        M = len(problem.tasks)
         d = task_embeddings.shape[1]
 
         # Initial assignment based on capability distance.
         X = torch.zeros(N, M)
 
-        for task_idx, task in enumerate(tasks):
+        for task_idx, task in enumerate(problem.tasks):
             distances = torch.sum(
-                (agent_embeddings - task.embedding.unsqueeze(0)) ** 2,
+                (
+                    agent_embeddings
+                    - task.embedding.unsqueeze(0)
+                ) ** 2,
                 dim=1,
             )
 
             agent_idx = int(torch.argmin(distances).item())
             X[agent_idx, task_idx] = 1.0
-
-        # Encode task dependencies in Theta.
-        Theta = torch.zeros(M, M)
-
-        for task_idx, task in enumerate(tasks):
-            for dependency in task.dependencies:
-                dep_idx = next(
-                    (
-                        idx
-                        for idx, candidate in enumerate(tasks)
-                        if candidate.id == dependency
-                    ),
-                    None,
-                )
-
-                if dep_idx is not None:
-                    Theta[task_idx, dep_idx] = 1.0
-
-        # Cost/coupling matrix is part of the EBMAO state.
-        C = torch.rand(M, M)
-        C.fill_diagonal_(0)
 
         kappa = torch.zeros(N, d)
 
@@ -191,8 +155,8 @@ class EBMAOOrchestrator(BaseOrchestrator):
             s=agent_embeddings,
             c=task_embeddings,
             kappa=kappa,
-            Theta=Theta,
-            C=C,
+            Theta=problem.interaction_graph.clone(),
+            C=problem.co_assignment_costs.clone(),
             N=N,
             M=M,
             d=d,
