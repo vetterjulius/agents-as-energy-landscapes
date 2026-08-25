@@ -79,8 +79,88 @@ def apply_robustness_perturbations(problem, seed, cfg):
 
     return perturbed
 
+def run_experiment(
+    experiment_name,
+    scenarios,
+    orchestrators,
+    base_seed,
+    num_seeds,
+    config,
+):
+    print(f"\n{'=' * 70}")
+    print(f"Starting experiment: {experiment_name}")
+    print(f"{'=' * 70}")
+
+    all_results = {}
+
+    for s_name, scenario in scenarios.items():
+        print(f"\n  Running Scenario: {s_name} ({num_seeds} seeds)")
+        all_results[s_name] = {}
+
+        for o_name in orchestrators.keys():
+            all_results[s_name][o_name] = {
+                "energy": [],
+                "load_balance": [],
+                "coordination": [],
+                "conflicts": [],
+                "runtime": [],
+                "specialization": [],
+                "task_clustering": [],
+                "communication_cost": [],
+                "conflict_rate": [],
+            }
+
+        for run_idx in range(num_seeds):
+            seed = base_seed + run_idx
+
+            base_problem = scenario.generate(seed)
+            problem = apply_robustness_perturbations(
+                base_problem,
+                seed,
+                config,
+            )
+
+            for o_name, orchestrator in orchestrators.items():
+                start_time = time.perf_counter()
+
+                try:
+                    X = orchestrator.solve(problem)
+                    elapsed = time.perf_counter() - start_time
+
+                    energy, _ = compute_energy(problem, X)
+                    lb = load_balance(X)
+                    coord = coordination_score(problem, X)
+                    conf = constraint_violations(problem, X)
+                    spec = specialization_degree(problem, X)
+                    clust = task_clustering(problem, X)
+                    comm = communication_cost(problem, X)
+                    confr = conflict_rate(problem, X)
+
+                    metrics = all_results[s_name][o_name]
+
+                    metrics["energy"].append(energy)
+                    metrics["load_balance"].append(lb)
+                    metrics["coordination"].append(coord)
+                    metrics["conflicts"].append(conf)
+                    metrics["runtime"].append(elapsed)
+                    metrics["specialization"].append(spec)
+                    metrics["task_clustering"].append(clust)
+                    metrics["communication_cost"].append(comm)
+                    metrics["conflict_rate"].append(confr)
+
+                except Exception as e:
+                    print(
+                        f"      [ERROR] {o_name} failed "
+                        f"on seed {seed}: {e}"
+                    )
+
+    return all_results
+
 def run_benchmark():
     print("Starting Energy-Based Orchestration Benchmark (EOB)...")
+    print("DEBUG config keys:", config.keys())
+    print("DEBUG solver config:", config.get("solver"))
+    print("DEBUG model config:", config.get("model"))
 
     if "model" not in config:
         config["model"] = {}
@@ -115,91 +195,51 @@ def run_benchmark():
         "Frustrated": FrustratedScenario(dim=dim)
     }
 
-    # Instantiate Orchestrators (Baselines + Primary Energy Landscape methods)
-    orchestrators = {
-        # Standard Baselines
+    world_baselines = {
         "Random": RandomOrchestrator(),
         "Capability Matching (Greedy)": GreedyOrchestrator(),
         "GreedyLB": GreedyLoadBalancingOrchestrator(),
         "RuleBased": RuleBasedOrchestrator(),
 
-        # New Classical Optimization Baselines
-        "Beam Search": BeamSearchOrchestrator(beam_width=config.get("beam_search", {}).get("beam_width", 5)),
+        "Beam Search": BeamSearchOrchestrator(
+            beam_width=config.get("beam_search", {}).get("beam_width", 5)
+        ),
         "Tabu Search": TabuSearchOrchestrator(
             max_iterations=config.get("tabu_search", {}).get("max_iterations", 50),
             tabu_tenure=config.get("tabu_search", {}).get("tabu_tenure", 5)
         ),
 
-        # Energy Landscape Solvers
+        "Energy (Hybrid)": EnergyHybridOrchestrator(config),
+        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(config),
+    }
+
+    energy_solver_battle = {
         "Energy (Pure Greedy)": EnergyPureGreedyOrchestrator(config),
         "Energy (Pure SA)": EnergyPureSAOrchestrator(config),
         "Energy (Hybrid)": EnergyHybridOrchestrator(config),
+
         "EBMAO (Pure Greedy)": EBMAOPureGreedyOrchestrator(config),
         "EBMAO (Pure SA)": EBMAOPureSAOrchestrator(config),
-        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(config)
+        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(config),
     }
 
-    # Results structure to accumulate multi-seed metrics
-    all_results = {}
+    world_results = run_experiment(
+        experiment_name="EOB: Energy/EBMAO vs Classical Baselines",
+        scenarios=scenarios,
+        orchestrators=world_baselines,
+        base_seed=base_seed,
+        num_seeds=num_seeds,
+        config=config,
+    )
 
-    for s_name, scenario in scenarios.items():
-        print(f"\n  Running Scenario: {s_name} ({num_seeds} seeds)")
-        all_results[s_name] = {}
-
-        # Initialize lists for each orchestrator
-        for o_name in orchestrators.keys():
-            all_results[s_name][o_name] = {
-                "energy": [],
-                "load_balance": [],
-                "coordination": [],
-                "conflicts": [],
-                "runtime": [],
-                "specialization": [],
-                "task_clustering": [],
-                "communication_cost": [],
-                "conflict_rate": []
-            }
-
-        # Multi-seed evaluation loop
-        for run_idx in range(num_seeds):
-            seed = base_seed + run_idx
-
-            # Generate unperturbed scenario problem instance
-            base_problem = scenario.generate(seed)
-
-            # Apply robustness perturbations if configured
-            problem = apply_robustness_perturbations(base_problem, seed, config)
-
-            for o_name, orchestrator in orchestrators.items():
-                start_time = time.perf_counter()
-                try:
-                    X = orchestrator.solve(problem)
-                    elapsed = time.perf_counter() - start_time
-
-                    # Compute all metrics on the perturbed problem (surviving environment)
-                    energy, _ = compute_energy(problem, X)
-                    lb = load_balance(X)
-                    coord = coordination_score(problem, X)
-                    conf = constraint_violations(problem, X)
-
-                    spec = specialization_degree(problem, X)
-                    clust = task_clustering(problem, X)
-                    comm = communication_cost(problem, X)
-                    confr = conflict_rate(problem, X)
-
-                    # Accumulate
-                    metrics = all_results[s_name][o_name]
-                    metrics["energy"].append(energy)
-                    metrics["load_balance"].append(lb)
-                    metrics["coordination"].append(coord)
-                    metrics["conflicts"].append(conf)
-                    metrics["runtime"].append(elapsed)
-                    metrics["specialization"].append(spec)
-                    metrics["task_clustering"].append(clust)
-                    metrics["communication_cost"].append(comm)
-                    metrics["conflict_rate"].append(confr)
-                except Exception as e:
-                    print(f"      [ERROR] {o_name} failed on seed {seed}: {e}")
+    solver_results = run_experiment(
+        experiment_name="Solver Battle: Energy Landscape Solvers",
+        scenarios=scenarios,
+        orchestrators=energy_solver_battle,
+        base_seed=base_seed,
+        num_seeds=num_seeds,
+        config=config,
+    )
 
     # Run Ablations on Interaction Scenario
     print("\n  Running Ablations on Interaction Scenario...")
@@ -207,11 +247,15 @@ def run_benchmark():
     rep_ablation_results = run_representation_ablations(interaction_problem, config)
     sol_ablation_results = run_solver_ablations(interaction_problem, config)
 
-    # Reporting and Plots
-    print("\nGenerating comprehensive paper-ready reports and plots...")
-    generate_markdown_report(all_results)
-    save_csv_results(all_results)
-    plot_results(all_results)
+    print("\nGenerating report for Experiment 1...")
+    generate_markdown_report(world_results)
+    save_csv_results(world_results)
+    plot_results(world_results)
+
+    print("\nGenerating report for Experiment 2...")
+    generate_markdown_report(solver_results)
+    save_csv_results(solver_results)
+    plot_results(solver_results)
 
     # Console summary of ablations
     print("\nRepresentation Ablation Results (Interaction Scenario):")

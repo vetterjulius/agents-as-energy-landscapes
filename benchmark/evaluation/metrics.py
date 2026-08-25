@@ -11,11 +11,15 @@ from state.orchestration_state import OrchestrationState
 def compute_energy(
     problem,
     X,
-    interaction_weight=1.0,
-    lambda_align=0.5,
-    cost_weight=1.0,
-    risk_weight=1.0,
+    energy_cfg=None,
 ):
+    energy_cfg = energy_cfg or {}
+
+    interaction_weight = energy_cfg.get("interaction_weight", 1.0)
+    lambda_align = energy_cfg.get("lambda_align", 0.5)
+    cost_weight = energy_cfg.get("cost_weight", 1.0)
+    risk_weight = energy_cfg.get("risk_weight", 1.0)
+
     N = len(problem.agents)
     M = len(problem.tasks)
     d = problem.agents[0].capability_embedding.shape[0]

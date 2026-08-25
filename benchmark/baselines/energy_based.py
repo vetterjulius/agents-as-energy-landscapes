@@ -1,89 +1,392 @@
 import torch
+
 from .base import Orchestrator
 from ..scenarios.base import ProblemInstance
 from state.orchestration_state import OrchestrationState
 from model.orchestrator import Orchestrator as SystemOrchestrator
 
+
 class EnergyBasedOrchestrator(Orchestrator):
+    """
+    Adapter between the benchmark ProblemInstance and the core
+    model.orchestrator.Orchestrator.
+
+    The benchmark config is structured as:
+
+        config["energy"]
+        config["experiment_1"]
+        config["experiment_2"]
+        config["ebmao"]
+
+    This class deliberately does NOT expect cfg["solver"] or cfg["model"].
+    """
+
     def __init__(self, cfg, search_mode="hybrid", theta_mode="static"):
         self.cfg = cfg
         self.search_mode = search_mode
         self.theta_mode = theta_mode
+
         self.energy_history = []
         self.temp_history = []
 
-    def solve(self, problem: ProblemInstance) -> torch.Tensor:
-        # Map ProblemInstance to OrchestrationState
+    def _build_state(self, problem: ProblemInstance):
         N = len(problem.agents)
         M = len(problem.tasks)
         d = problem.agents[0].capability_embedding.shape[0]
 
-        s = torch.stack([a.capability_embedding for a in problem.agents])
-        c = torch.stack([t.embedding for t in problem.tasks])
-        kappa = torch.zeros(N, d)
-
-        # Initial random assignment for pure SA, or default modulo assignment
-        X_init = torch.zeros(N, M)
-        for t in range(M):
-            X_init[t % N, t] = 1.0
-
-        state = OrchestrationState(
-            X=X_init, s=s, c=c, kappa=kappa,
-            Theta=problem.interaction_graph,
-            C=problem.co_assignment_costs,
-            N=N, M=M, d=d
+        s = torch.stack(
+            [agent.capability_embedding for agent in problem.agents]
         )
 
-        # We adapt our config to match what model.Orchestrator expects
-        model_cfg = {
+        c = torch.stack(
+            [task.embedding for task in problem.tasks]
+        )
+
+        kappa = torch.zeros(
+            N,
+            d,
+            dtype=s.dtype,
+            device=s.device,
+        )
+
+        # Deterministic initial assignment.
+        X_init = torch.zeros(
+            N,
+            M,
+            dtype=s.dtype,
+            device=s.device,
+        )
+
+        for task_idx in range(M):
+            X_init[task_idx % N, task_idx] = 1.0
+
+        return OrchestrationState(
+            X=X_init,
+            s=s,
+            c=c,
+            kappa=kappa,
+            Theta=problem.interaction_graph,
+            C=problem.co_assignment_costs,
+            N=N,
+            M=M,
+            d=d,
+        )
+
+    def _build_model_config(self, problem: ProblemInstance):
+        N = len(problem.agents)
+        M = len(problem.tasks)
+        d = problem.agents[0].capability_embedding.shape[0]
+
+        energy_cfg = self.cfg.get("energy", {})
+        exp1_cfg = self.cfg.get("experiment_1", {})
+        exp2_cfg = self.cfg.get("experiment_2", {})
+        ebmao_cfg = self.cfg.get("ebmao", {})
+
+        # ------------------------------------------------------------
+        # Energy parameters
+        # ------------------------------------------------------------
+
+        lambda_align = energy_cfg.get("lambda_align", 0.5)
+        lambda_memory = energy_cfg.get("lambda_memory", 0.5)
+
+        interaction_weight = energy_cfg.get(
+            "interaction_weight",
+            1.0,
+        )
+
+        risk_weight = energy_cfg.get(
+            "risk_weight",
+            1.0,
+        )
+
+        cost_weight = energy_cfg.get(
+            "cost_weight",
+            1.0,
+        )
+
+        # ------------------------------------------------------------
+        # Solver parameters
+        # ------------------------------------------------------------
+        #
+        # Experiment 2 contains explicit solver-specific parameters.
+        # Experiment 1 only defines the main proposed solver and its
+        # iteration count.
+        #
+        # We therefore merge:
+        #
+        #   general energy config
+        #       +
+        #   experiment_2 solver config
+        #       +
+        #   EBMAO search parameters where appropriate
+        #
+        # No access to cfg["solver"] or cfg["model"].
+        # ------------------------------------------------------------
+
+        solver_cfg = {}
+
+        # Experiment 2 solver-specific temperature configuration.
+        if self.search_mode == "pure_sa":
+            solver_cfg.update(exp2_cfg.get("energy_sa", {}))
+
+        elif self.search_mode == "hybrid":
+            solver_cfg.update(exp2_cfg.get("energy_hybrid", {}))
+
+        elif self.search_mode == "pure_greedy":
+            solver_cfg.update(exp2_cfg.get("energy_greedy", {}))
+
+        # EBMAO config contains the richer proposal/search defaults.
+        #
+        # We use these only as fallbacks, so explicit Energy solver
+        # settings in experiment_2 remain authoritative.
+        for key in (
+            "temperature_init",
+            "min_temperature",
+            "max_temperature",
+            "target_accept_rate",
+            "proposal_candidates",
+            "proposal_task_sample",
+            "agent_sample_size",
+            "block_move_size",
+            "warm_start_steps",
+            "warm_start_type",
+            "hybrid_cleanup_prob",
+            "local_refine_steps",
+        ):
+            if key not in solver_cfg and key in ebmao_cfg:
+                solver_cfg[key] = ebmao_cfg[key]
+
+        # ------------------------------------------------------------
+        # Defaults
+        # ------------------------------------------------------------
+
+        temperature_init = solver_cfg.get(
+            "temperature_init",
+            4.0,
+        )
+
+        min_temperature = solver_cfg.get(
+            "min_temperature",
+            1.0,
+        )
+
+        max_temperature = solver_cfg.get(
+            "max_temperature",
+            6.0,
+        )
+
+        target_accept_rate = solver_cfg.get(
+            "target_accept_rate",
+            0.3,
+        )
+
+        proposal_candidates = solver_cfg.get(
+            "proposal_candidates",
+            12,
+        )
+
+        proposal_task_sample = solver_cfg.get(
+            "proposal_task_sample",
+            8,
+        )
+
+        agent_sample_size = solver_cfg.get(
+            "agent_sample_size",
+            6,
+        )
+
+        block_move_size = solver_cfg.get(
+            "block_move_size",
+            4,
+        )
+
+        # ------------------------------------------------------------
+        # Search-mode behavior
+        # ------------------------------------------------------------
+
+        if self.search_mode == "pure_sa":
+            warm_start_steps = 0
+            warm_start_type = "random"
+            hybrid_cleanup_prob = 0.0
+            local_refine_steps = 0
+
+        elif self.search_mode == "pure_greedy":
+            warm_start_steps = solver_cfg.get(
+                "warm_start_steps",
+                0,
+            )
+            warm_start_type = solver_cfg.get(
+                "warm_start_type",
+                "greedy",
+            )
+            hybrid_cleanup_prob = 0.0
+            local_refine_steps = solver_cfg.get(
+                "local_refine_steps",
+                2,
+            )
+
+        else:
+            warm_start_steps = solver_cfg.get(
+                "warm_start_steps",
+                6,
+            )
+            warm_start_type = solver_cfg.get(
+                "warm_start_type",
+                "greedy",
+            )
+            hybrid_cleanup_prob = solver_cfg.get(
+                "hybrid_cleanup_prob",
+                0.25,
+            )
+            local_refine_steps = solver_cfg.get(
+                "local_refine_steps",
+                2,
+            )
+
+        # ------------------------------------------------------------
+        # Iterations
+        # ------------------------------------------------------------
+
+        if self.search_mode in (
+            "pure_sa",
+            "pure_greedy",
+            "hybrid",
+        ):
+            iterations = exp2_cfg.get(
+                "iterations",
+                exp1_cfg.get("iterations", 100),
+            )
+        else:
+            iterations = exp1_cfg.get(
+                "iterations",
+                100,
+            )
+
+        # ------------------------------------------------------------
+        # Final config expected by model.orchestrator.Orchestrator
+        # ------------------------------------------------------------
+
+        return {
             "model": {
                 "num_agents": N,
                 "num_tasks": M,
                 "dim": d,
-                "lambda_align": self.cfg["model"].get("lambda_align", 0.5),
-                "eta_theta": 0.1,
-                "eta_memory": 0.05,
-                "risk_weight": self.cfg["model"].get("risk_weight", 1.0),
-                "interaction_weight": self.cfg["model"].get("interaction_weight", 1.0),
-                "cost_weight": self.cfg["model"].get("cost_weight", 1.0),
-                "temperature_init": self.cfg["solver"].get("temperature_init", 1.0),
-                "min_temperature": self.cfg["solver"].get("min_temperature", 0.01),
-                "max_temperature": self.cfg["solver"].get("max_temperature", 2.0),
-                "target_accept_rate": self.cfg["solver"].get("target_accept_rate", 0.25),
-                "proposal_candidates": 12,
-                "proposal_task_sample": 8,
-                "agent_sample_size": 6,
-                "block_move_size": 4,
-                "warm_start_steps": 6 if self.search_mode != "pure_sa" else 0,
-                "warm_start_type": "greedy" if self.search_mode != "pure_sa" else "random",
-                "hybrid_cleanup_prob": 0.25 if self.search_mode == "hybrid" else 0.0,
-                "local_refine_steps": 2 if self.search_mode != "pure_sa" else 0,
+
+                # Energy terms
+                "lambda_align": lambda_align,
+                "lambda_memory": lambda_memory,
+                "interaction_weight": interaction_weight,
+                "risk_weight": risk_weight,
+                "cost_weight": cost_weight,
+
+                # Interaction / memory dynamics
+                "eta_theta": ebmao_cfg.get(
+                    "eta_theta",
+                    0.1,
+                ),
+                "eta_memory": ebmao_cfg.get(
+                    "eta_memory",
+                    0.05,
+                ),
+
+                # Temperature / SA
+                "temperature_init": temperature_init,
+                "min_temperature": min_temperature,
+                "max_temperature": max_temperature,
+                "target_accept_rate": target_accept_rate,
+
+                # Proposal mechanism
+                "proposal_candidates": proposal_candidates,
+                "proposal_task_sample": proposal_task_sample,
+                "agent_sample_size": agent_sample_size,
+                "block_move_size": block_move_size,
+
+                # Warm start / local search
+                "warm_start_steps": warm_start_steps,
+                "warm_start_type": warm_start_type,
+                "hybrid_cleanup_prob": hybrid_cleanup_prob,
+                "local_refine_steps": local_refine_steps,
+
+                # Modes
                 "theta_mode": self.theta_mode,
-                "search_mode": self.search_mode
+                "search_mode": self.search_mode,
+
+                # Explicit iteration count in case the core
+                # orchestrator reads it from model config.
+                "iterations": iterations,
             }
         }
 
-        orchestrator = SystemOrchestrator(model_cfg, initial_state=state, W_risk=problem.risk_weights)
+    def solve(self, problem: ProblemInstance) -> torch.Tensor:
+        state = self._build_state(problem)
 
-        # Record initial states
-        self.energy_history = [orchestrator.total_energy().item()]
-        self.temp_history = [orchestrator.T]
+        model_cfg = self._build_model_config(problem)
 
-        for _ in range(self.cfg["solver"].get("iterations", 100)):
+        orchestrator = SystemOrchestrator(
+            model_cfg,
+            initial_state=state,
+            W_risk=problem.risk_weights,
+        )
+
+        # Determine iteration count from the same benchmark config.
+        exp1_cfg = self.cfg.get("experiment_1", {})
+        exp2_cfg = self.cfg.get("experiment_2", {})
+
+        iterations = exp2_cfg.get(
+            "iterations",
+            exp1_cfg.get("iterations", 100),
+        )
+
+        # Reset histories for every solve.
+        self.energy_history = []
+        self.temp_history = []
+
+        # Initial state.
+        self.energy_history.append(
+            orchestrator.total_energy().item()
+        )
+
+        self.temp_history.append(
+            getattr(orchestrator, "T", None)
+        )
+
+        # Main optimization loop.
+        for _ in range(iterations):
             orchestrator.step()
-            self.energy_history.append(orchestrator.total_energy().item())
-            self.temp_history.append(orchestrator.T)
+
+            self.energy_history.append(
+                orchestrator.total_energy().item()
+            )
+
+            self.temp_history.append(
+                getattr(orchestrator, "T", None)
+            )
 
         return orchestrator.state.X
 
+
 class EnergyPureSAOrchestrator(EnergyBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
-        super().__init__(cfg, search_mode="pure_sa", theta_mode=theta_mode)
+        super().__init__(
+            cfg,
+            search_mode="pure_sa",
+            theta_mode=theta_mode,
+        )
+
 
 class EnergyHybridOrchestrator(EnergyBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
-        super().__init__(cfg, search_mode="hybrid", theta_mode=theta_mode)
+        super().__init__(
+            cfg,
+            search_mode="hybrid",
+            theta_mode=theta_mode,
+        )
+
 
 class EnergyPureGreedyOrchestrator(EnergyBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
-        super().__init__(cfg, search_mode="pure_greedy", theta_mode=theta_mode)
+        super().__init__(
+            cfg,
+            search_mode="pure_greedy",
+            theta_mode=theta_mode,
+        )

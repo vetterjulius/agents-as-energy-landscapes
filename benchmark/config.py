@@ -1,68 +1,101 @@
-# Configuration for the benchmark
 config = {
-    "dim": 8,
-    "num_agents": 5,
-    "num_tasks": 10,
     "seed": 42,
+    "num_evaluation_seeds": 30,
 
-    # Core Evaluation Parameters
-    "num_evaluation_seeds": 1,  # Run 1 seed per scenario for statistical significance (optimized for fast execution)
-
-    "solver": {
-        "iterations": 10,  # Optimized iterations for fast and stable execution
-        "temperature_init": 1.0,
-        "min_temperature": 0.01,
-        "max_temperature": 2.0,
-        "target_accept_rate": 0.25
-    },
-    
-    "training": {
-        "iterations": 10,
+    "problem": {
+        "dim": 8,
+        "num_agents": 5,
+        "num_tasks": 10,
     },
 
-    "model": {
+    "energy": {
         "lambda_align": 0.5,
+        "lambda_memory": 0.5,
         "interaction_weight": 1.0,
         "risk_weight": 1.0,
-        "cost_weight": 1.0
+        "risk_scale": 1.0,
+        "cost_weight": 1.0,
     },
 
-    # Robustness Switches and Noise Levels (Configurable toggles)
+    # Main solver used by Experiment 1 for the proposed systems.
+    "experiment_1": {
+        "energy_solver": "hybrid",
+        "iterations": 100,
+    },
+
+    # Solver comparison on the same energy landscape.
+    "experiment_2": {
+        "iterations": 100,
+
+        "energy_greedy": {},
+        "energy_sa": {
+            "temperature_init": 4.0,
+            "min_temperature": 1.0,
+            "max_temperature": 6.0,
+            "target_accept_rate": 0.3,
+        },
+        "energy_hybrid": {
+            "temperature_init": 4.0,
+            "min_temperature": 1.0,
+            "max_temperature": 6.0,
+            "target_accept_rate": 0.3,
+        },
+
+        "beam_search": {
+            "beam_width": 3,
+        },
+
+        "tabu_search": {
+            "max_iterations": 20,
+            "tabu_tenure": 4,
+        },
+    },
+
+    "ebmao": {
+        "lambda_align": 0.5,
+        "lambda_memory": 0.5,
+        "eta_theta": 0.1,
+        "eta_memory": 0.05,
+
+        "temperature_init": 4.0,
+        "min_temperature": 1.0,
+        "max_temperature": 6.0,
+        "target_accept_rate": 0.3,
+
+        "proposal_candidates": 12,
+        "proposal_task_sample": 8,
+        "agent_sample_size": 6,
+        "block_move_size": 4,
+
+        "warm_start_steps": 6,
+        "warm_start_type": "greedy",
+        "hybrid_cleanup_prob": 0.25,
+        "local_refine_steps": 2,
+    },
+
     "robustness": {
         "capability_noise": {
             "enabled": False,
-            "level": 0.15  # Gaussian noise scale to inject into agent embeddings
+            "level": 0.15,
         },
         "risk_weights_noise": {
             "enabled": False,
-            "level": 0.15  # Noise level for risk weights perturbation
+            "level": 0.15,
         },
         "agent_failure": {
             "enabled": False,
-            "rate": 0.20   # Fraction of agents failing during solving
+            "rate": 0.20,
         },
         "comm_outages": {
             "enabled": False,
-            "rate": 0.25   # Fraction of interaction graph channels to zero out
-        }
+            "rate": 0.25,
+        },
     },
 
-    # Scalability Sweep Parameters
     "scalability": {
-        "agents_scaling": [5, 10, 20],  # Scale N
-        "tasks_scaling": [20, 50, 100],  # Scale M up to 100 (for extremely fast sweeps)
-        "sweep_iterations": 10,  # Fewer iterations for larger scalability runs to keep them fast
-    },
-
-    # Beam Search configuration
-    "beam_search": {
-        "beam_width": 3
-    },
-
-    # Tabu Search configuration
-    "tabu_search": {
-        "max_iterations": 20,
-        "tabu_tenure": 4
+        "agents_scaling": [5, 10, 20],
+        "tasks_scaling": [20, 50, 100],
+        "sweep_iterations": 10,
     },
 
     "sweep": {
@@ -70,6 +103,6 @@ config = {
         "risk_weights": [1.0],
         "cost_weights": [1.0],
         "scenario": "Interaction",
-        "iterations": 10
-    }
+        "iterations": 100,
+    },
 }
