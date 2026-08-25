@@ -8,17 +8,19 @@ from model.orchestrator import Orchestrator as SystemOrchestrator
 
 class EnergyBasedOrchestrator(Orchestrator):
     """
-    Adapter between the benchmark ProblemInstance and the core
-    model.orchestrator.Orchestrator.
+    Benchmark adapter for the core energy-based orchestrator.
 
-    The benchmark config is structured as:
+    The benchmark runner is responsible for selecting the experiment
+    and constructing the experiment-specific configuration.
 
-        config["energy"]
-        config["experiment_1"]
-        config["experiment_2"]
-        config["ebmao"]
+    This adapter only consumes the configuration passed to it:
 
-    This class deliberately does NOT expect cfg["solver"] or cfg["model"].
+        cfg["energy"]
+        cfg["ebmao"]
+        cfg["iterations"]
+        cfg["solver"]
+
+    It does not know about experiment_1 or experiment_2.
     """
 
     def __init__(self, cfg, search_mode="hybrid", theta_mode="static"):
@@ -78,16 +80,22 @@ class EnergyBasedOrchestrator(Orchestrator):
         d = problem.agents[0].capability_embedding.shape[0]
 
         energy_cfg = self.cfg.get("energy", {})
-        exp1_cfg = self.cfg.get("experiment_1", {})
-        exp2_cfg = self.cfg.get("experiment_2", {})
         ebmao_cfg = self.cfg.get("ebmao", {})
+        solver_cfg = self.cfg.get("solver", {})
 
         # ------------------------------------------------------------
         # Energy parameters
         # ------------------------------------------------------------
 
-        lambda_align = energy_cfg.get("lambda_align", 0.5)
-        lambda_memory = energy_cfg.get("lambda_memory", 0.5)
+        lambda_align = energy_cfg.get(
+            "lambda_align",
+            0.5,
+        )
+
+        lambda_memory = energy_cfg.get(
+            "lambda_memory",
+            ebmao_cfg.get("lambda_memory", 0.5),
+        )
 
         interaction_weight = energy_cfg.get(
             "interaction_weight",
@@ -99,6 +107,11 @@ class EnergyBasedOrchestrator(Orchestrator):
             1.0,
         )
 
+        risk_scale = energy_cfg.get(
+            "risk_scale",
+            1.0,
+        )
+
         cost_weight = energy_cfg.get(
             "cost_weight",
             1.0,
@@ -106,102 +119,56 @@ class EnergyBasedOrchestrator(Orchestrator):
 
         # ------------------------------------------------------------
         # Solver parameters
-        # ------------------------------------------------------------
         #
-        # Experiment 2 contains explicit solver-specific parameters.
-        # Experiment 1 only defines the main proposed solver and its
-        # iteration count.
-        #
-        # We therefore merge:
-        #
-        #   general energy config
-        #       +
-        #   experiment_2 solver config
-        #       +
-        #   EBMAO search parameters where appropriate
-        #
-        # No access to cfg["solver"] or cfg["model"].
-        # ------------------------------------------------------------
-
-        solver_cfg = {}
-
-        # Experiment 2 solver-specific temperature configuration.
-        if self.search_mode == "pure_sa":
-            solver_cfg.update(exp2_cfg.get("energy_sa", {}))
-
-        elif self.search_mode == "hybrid":
-            solver_cfg.update(exp2_cfg.get("energy_hybrid", {}))
-
-        elif self.search_mode == "pure_greedy":
-            solver_cfg.update(exp2_cfg.get("energy_greedy", {}))
-
-        # EBMAO config contains the richer proposal/search defaults.
-        #
-        # We use these only as fallbacks, so explicit Energy solver
-        # settings in experiment_2 remain authoritative.
-        for key in (
-            "temperature_init",
-            "min_temperature",
-            "max_temperature",
-            "target_accept_rate",
-            "proposal_candidates",
-            "proposal_task_sample",
-            "agent_sample_size",
-            "block_move_size",
-            "warm_start_steps",
-            "warm_start_type",
-            "hybrid_cleanup_prob",
-            "local_refine_steps",
-        ):
-            if key not in solver_cfg and key in ebmao_cfg:
-                solver_cfg[key] = ebmao_cfg[key]
-
-        # ------------------------------------------------------------
-        # Defaults
+        # The runner already selected the solver and passed the
+        # relevant solver configuration.
         # ------------------------------------------------------------
 
         temperature_init = solver_cfg.get(
             "temperature_init",
-            4.0,
+            ebmao_cfg.get("temperature_init", 4.0),
         )
 
         min_temperature = solver_cfg.get(
             "min_temperature",
-            1.0,
+            ebmao_cfg.get("min_temperature", 1.0),
         )
 
         max_temperature = solver_cfg.get(
             "max_temperature",
-            6.0,
+            ebmao_cfg.get("max_temperature", 6.0),
         )
 
         target_accept_rate = solver_cfg.get(
             "target_accept_rate",
-            0.3,
+            ebmao_cfg.get("target_accept_rate", 0.3),
         )
 
         proposal_candidates = solver_cfg.get(
             "proposal_candidates",
-            12,
+            ebmao_cfg.get("proposal_candidates", 12),
         )
 
         proposal_task_sample = solver_cfg.get(
             "proposal_task_sample",
-            8,
+            ebmao_cfg.get("proposal_task_sample", 8),
         )
 
         agent_sample_size = solver_cfg.get(
             "agent_sample_size",
-            6,
+            ebmao_cfg.get("agent_sample_size", 6),
         )
 
         block_move_size = solver_cfg.get(
             "block_move_size",
-            4,
+            ebmao_cfg.get("block_move_size", 4),
         )
 
         # ------------------------------------------------------------
         # Search-mode behavior
+        #
+        # search_mode comes from the adapter class itself.
+        # Experiment selection does NOT happen here.
         # ------------------------------------------------------------
 
         if self.search_mode == "pure_sa":
@@ -215,11 +182,14 @@ class EnergyBasedOrchestrator(Orchestrator):
                 "warm_start_steps",
                 0,
             )
+
             warm_start_type = solver_cfg.get(
                 "warm_start_type",
                 "greedy",
             )
+
             hybrid_cleanup_prob = 0.0
+
             local_refine_steps = solver_cfg.get(
                 "local_refine_steps",
                 2,
@@ -228,42 +198,37 @@ class EnergyBasedOrchestrator(Orchestrator):
         else:
             warm_start_steps = solver_cfg.get(
                 "warm_start_steps",
-                6,
+                ebmao_cfg.get("warm_start_steps", 6),
             )
+
             warm_start_type = solver_cfg.get(
                 "warm_start_type",
-                "greedy",
+                ebmao_cfg.get("warm_start_type", "greedy"),
             )
+
             hybrid_cleanup_prob = solver_cfg.get(
                 "hybrid_cleanup_prob",
-                0.25,
+                ebmao_cfg.get("hybrid_cleanup_prob", 0.25),
             )
+
             local_refine_steps = solver_cfg.get(
                 "local_refine_steps",
-                2,
+                ebmao_cfg.get("local_refine_steps", 2),
             )
 
         # ------------------------------------------------------------
         # Iterations
+        #
+        # The runner owns the experiment iteration count.
         # ------------------------------------------------------------
 
-        if self.search_mode in (
-            "pure_sa",
-            "pure_greedy",
-            "hybrid",
-        ):
-            iterations = exp2_cfg.get(
-                "iterations",
-                exp1_cfg.get("iterations", 100),
-            )
-        else:
-            iterations = exp1_cfg.get(
-                "iterations",
-                100,
-            )
+        iterations = self.cfg.get(
+            "iterations",
+            100,
+        )
 
         # ------------------------------------------------------------
-        # Final config expected by model.orchestrator.Orchestrator
+        # Final config expected by the core orchestrator
         # ------------------------------------------------------------
 
         return {
@@ -277,6 +242,7 @@ class EnergyBasedOrchestrator(Orchestrator):
                 "lambda_memory": lambda_memory,
                 "interaction_weight": interaction_weight,
                 "risk_weight": risk_weight,
+                "risk_scale": risk_scale,
                 "cost_weight": cost_weight,
 
                 # Interaction / memory dynamics
@@ -284,6 +250,7 @@ class EnergyBasedOrchestrator(Orchestrator):
                     "eta_theta",
                     0.1,
                 ),
+
                 "eta_memory": ebmao_cfg.get(
                     "eta_memory",
                     0.05,
@@ -311,8 +278,7 @@ class EnergyBasedOrchestrator(Orchestrator):
                 "theta_mode": self.theta_mode,
                 "search_mode": self.search_mode,
 
-                # Explicit iteration count in case the core
-                # orchestrator reads it from model config.
+                # Explicit iteration count
                 "iterations": iterations,
             }
         }
@@ -328,13 +294,11 @@ class EnergyBasedOrchestrator(Orchestrator):
             W_risk=problem.risk_weights,
         )
 
-        # Determine iteration count from the same benchmark config.
-        exp1_cfg = self.cfg.get("experiment_1", {})
-        exp2_cfg = self.cfg.get("experiment_2", {})
-
-        iterations = exp2_cfg.get(
+        # The runner owns the experiment configuration and therefore
+        # provides the iteration count directly.
+        iterations = self.cfg.get(
             "iterations",
-            exp1_cfg.get("iterations", 100),
+            100,
         )
 
         # Reset histories for every solve.

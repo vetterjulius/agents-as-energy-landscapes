@@ -12,14 +12,17 @@ class EBMAOBasedOrchestrator(Orchestrator):
     """
     Benchmark adapter for the core EBMAO orchestrator.
 
-    Benchmark configuration is read from:
+    The runner is responsible for selecting the experiment and
+    constructing the solver-specific configuration.
+
+    This adapter only consumes:
 
         cfg["energy"]
-        cfg["experiment_1"]
-        cfg["experiment_2"]
         cfg["ebmao"]
+        cfg["solver"]
+        cfg["iterations"]
 
-    No cfg["model"] or cfg["training"] dependency.
+    No dependency on cfg["experiment_1"] or cfg["experiment_2"].
     """
 
     def __init__(self, cfg, search_mode="hybrid", theta_mode="static"):
@@ -77,6 +80,7 @@ class EBMAOBasedOrchestrator(Orchestrator):
 
         energy_cfg = self.cfg.get("energy", {})
         ebmao_cfg = self.cfg.get("ebmao", {})
+        solver_cfg = self.cfg.get("solver", {})
 
         # ------------------------------------------------------------
         # Energy configuration
@@ -84,12 +88,15 @@ class EBMAOBasedOrchestrator(Orchestrator):
 
         lambda_align = energy_cfg.get(
             "lambda_align",
-            ebmao_cfg.get("lambda_align", 0.5),
+            0.5,
         )
 
-        lambda_memory = ebmao_cfg.get(
+        lambda_memory = energy_cfg.get(
             "lambda_memory",
-            0.5,
+            ebmao_cfg.get(
+                "lambda_memory",
+                0.5,
+            ),
         )
 
         interaction_weight = energy_cfg.get(
@@ -113,51 +120,94 @@ class EBMAOBasedOrchestrator(Orchestrator):
         )
 
         # ------------------------------------------------------------
-        # EBMAO configuration
+        # EBMAO dynamics
         # ------------------------------------------------------------
 
-        temperature_init = ebmao_cfg.get(
+        eta_theta = ebmao_cfg.get(
+            "eta_theta",
+            0.1,
+        )
+
+        eta_memory = ebmao_cfg.get(
+            "eta_memory",
+            0.05,
+        )
+
+        # ------------------------------------------------------------
+        # Solver configuration
+        #
+        # The runner has already selected the experiment and solver.
+        # The adapter only reads the resulting solver configuration.
+        #
+        # Explicit solver values override EBMAO defaults.
+        # ------------------------------------------------------------
+
+        temperature_init = solver_cfg.get(
             "temperature_init",
-            4.0,
+            ebmao_cfg.get(
+                "temperature_init",
+                4.0,
+            ),
         )
 
-        min_temperature = ebmao_cfg.get(
+        min_temperature = solver_cfg.get(
             "min_temperature",
-            1.0,
+            ebmao_cfg.get(
+                "min_temperature",
+                1.0,
+            ),
         )
 
-        max_temperature = ebmao_cfg.get(
+        max_temperature = solver_cfg.get(
             "max_temperature",
-            6.0,
+            ebmao_cfg.get(
+                "max_temperature",
+                6.0,
+            ),
         )
 
-        target_accept_rate = ebmao_cfg.get(
+        target_accept_rate = solver_cfg.get(
             "target_accept_rate",
-            0.3,
+            ebmao_cfg.get(
+                "target_accept_rate",
+                0.3,
+            ),
         )
 
-        proposal_candidates = ebmao_cfg.get(
+        proposal_candidates = solver_cfg.get(
             "proposal_candidates",
-            12,
+            ebmao_cfg.get(
+                "proposal_candidates",
+                12,
+            ),
         )
 
-        proposal_task_sample = ebmao_cfg.get(
+        proposal_task_sample = solver_cfg.get(
             "proposal_task_sample",
-            8,
+            ebmao_cfg.get(
+                "proposal_task_sample",
+                8,
+            ),
         )
 
-        agent_sample_size = ebmao_cfg.get(
+        agent_sample_size = solver_cfg.get(
             "agent_sample_size",
-            6,
+            ebmao_cfg.get(
+                "agent_sample_size",
+                6,
+            ),
         )
 
-        block_move_size = ebmao_cfg.get(
+        block_move_size = solver_cfg.get(
             "block_move_size",
-            4,
+            ebmao_cfg.get(
+                "block_move_size",
+                4,
+            ),
         )
 
         # ------------------------------------------------------------
-        # Search mode
+        # Search-mode behavior
         # ------------------------------------------------------------
 
         if self.search_mode == "pure_sa":
@@ -167,40 +217,67 @@ class EBMAOBasedOrchestrator(Orchestrator):
             local_refine_steps = 0
 
         elif self.search_mode == "pure_greedy":
-            warm_start_steps = ebmao_cfg.get(
+            warm_start_steps = solver_cfg.get(
                 "warm_start_steps",
-                6,
+                ebmao_cfg.get(
+                    "warm_start_steps",
+                    6,
+                ),
             )
-            warm_start_type = ebmao_cfg.get(
+
+            warm_start_type = solver_cfg.get(
                 "warm_start_type",
-                "greedy",
+                ebmao_cfg.get(
+                    "warm_start_type",
+                    "greedy",
+                ),
             )
+
             hybrid_cleanup_prob = 0.0
-            local_refine_steps = ebmao_cfg.get(
+
+            local_refine_steps = solver_cfg.get(
                 "local_refine_steps",
-                2,
+                ebmao_cfg.get(
+                    "local_refine_steps",
+                    2,
+                ),
             )
 
         else:
-            warm_start_steps = ebmao_cfg.get(
+            warm_start_steps = solver_cfg.get(
                 "warm_start_steps",
-                6,
+                ebmao_cfg.get(
+                    "warm_start_steps",
+                    6,
+                ),
             )
-            warm_start_type = ebmao_cfg.get(
+
+            warm_start_type = solver_cfg.get(
                 "warm_start_type",
-                "greedy",
+                ebmao_cfg.get(
+                    "warm_start_type",
+                    "greedy",
+                ),
             )
-            hybrid_cleanup_prob = ebmao_cfg.get(
+
+            hybrid_cleanup_prob = solver_cfg.get(
                 "hybrid_cleanup_prob",
-                0.25,
+                ebmao_cfg.get(
+                    "hybrid_cleanup_prob",
+                    0.25,
+                ),
             )
-            local_refine_steps = ebmao_cfg.get(
+
+            local_refine_steps = solver_cfg.get(
                 "local_refine_steps",
-                2,
+                ebmao_cfg.get(
+                    "local_refine_steps",
+                    2,
+                ),
             )
 
         # ------------------------------------------------------------
-        # Core EBMAO config
+        # Final config expected by core EBMAO orchestrator
         # ------------------------------------------------------------
 
         return {
@@ -218,14 +295,8 @@ class EBMAOBasedOrchestrator(Orchestrator):
                 "cost_weight": cost_weight,
 
                 # EBMAO dynamics
-                "eta_theta": ebmao_cfg.get(
-                    "eta_theta",
-                    0.1,
-                ),
-                "eta_memory": ebmao_cfg.get(
-                    "eta_memory",
-                    0.05,
-                ),
+                "eta_theta": eta_theta,
+                "eta_memory": eta_memory,
 
                 # Temperature
                 "temperature_init": temperature_init,
@@ -256,26 +327,16 @@ class EBMAOBasedOrchestrator(Orchestrator):
 
         model_cfg = self._build_model_config(problem)
 
-        # Current benchmark configuration defines the number of
-        # iterations in experiment_1 / experiment_2.
-        iterations = self.cfg.get(
-            "experiment_2",
-            {},
-        ).get(
-            "iterations",
-            self.cfg.get(
-                "experiment_1",
-                {},
-            ).get(
-                "iterations",
-                100,
-            ),
-        )
-
         orchestrator = EBMAOSystemOrchestrator(
             model_cfg,
             initial_state=state,
             W_risk=problem.risk_weights,
+        )
+
+        # Iteration count is selected by the benchmark runner.
+        iterations = self.cfg.get(
+            "iterations",
+            100,
         )
 
         for _ in range(iterations):

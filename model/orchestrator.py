@@ -110,21 +110,37 @@ class Orchestrator:
         self.energy_registry.add(CostEnergy(weight=self.w_cost))
         self.energy_registry.add(RiskEnergy(self.risk_predictor, weight=self.w_risk))
 
-        # Dynamics components
+        proposal_mode = (
+            "random"
+            if self.search_mode == "pure_sa"
+            else "guided"
+        )
+            
+
         self.proposal_mechanism = AssignmentProposal(
             self.energy_registry,
             lambda_align=self.lambda_align,
             num_tasks=self.proposal_task_sample,
             block_size=self.block_move_size,
-            agent_sample_size=self.agent_sample_size
+            agent_sample_size=self.agent_sample_size,
+            mode=proposal_mode,
         )
+
+        sampler_mode = (
+            "hybrid"
+            if self.search_mode == "hybrid"
+            else "sa"
+        )
+
         self.sampler = SimulatedAnnealingSampler(
             self.proposal_mechanism,
             self.energy_registry,
             T_init=self.T_init,
             target_accept=self.target_accept,
-            num_candidates=self.proposal_candidates
+            num_candidates=self.proposal_candidates,
+            mode=sampler_mode,
         )
+
         self.theta_updater = ThetaUpdater(self.eta_theta)
         self.memory_updater = MemoryUpdater(self.eta_memory)
         self.temperature_controller = TemperatureController(

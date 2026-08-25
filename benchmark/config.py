@@ -106,3 +106,28 @@ config = {
         "iterations": 100,
     },
 }
+
+quick_config = {
+    "num_evaluation_seeds": 1,
+
+    "experiment_1": {
+        "iterations": 10,
+    },
+
+    "experiment_2": {
+        "iterations": 10,
+    },
+
+    "scalability": {
+        "sweep_iterations": 3,
+    },
+
+    "sweep": {
+        "iterations": 10,
+    },
+
+    # Expensive secondary experiments are skipped in quick mode.
+    "run_scale_sweep": False,
+    "run_coupling_sweep": False,
+    "run_dynamic_benchmark": False,
+}
