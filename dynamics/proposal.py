@@ -3,6 +3,31 @@ import torch
 
 
 class AssignmentProposal:
+    """
+    Proposal mechanism for the classical Energy-based orchestrator.
+
+    The proposal mechanism is deliberately separated from the sampler:
+
+        Proposal
+            -> generates a candidate X'
+
+        SimulatedAnnealingSampler
+            -> evaluates E(X')
+            -> computes dE
+            -> applies Metropolis acceptance
+
+    Therefore:
+
+        mode="random"
+            means random proposal generation.
+
+        mode="guided"
+            means energy-guided proposal generation.
+
+    The sampler remains responsible for deciding whether a proposal
+    is actually accepted.
+    """
+
     def __init__(
         self,
         energy_registry,
@@ -13,7 +38,7 @@ class AssignmentProposal:
         mode="guided",
     ):
         self.energy_registry = energy_registry
-        self.lambda_align = lambda_align
+        self.lambda_align = float(lambda_align)
 
         self.num_tasks = max(1, int(num_tasks))
         self.block_size = max(1, int(block_size))
@@ -21,7 +46,10 @@ class AssignmentProposal:
         if agent_sample_size is None:
             self.agent_sample_size = None
         else:
-            self.agent_sample_size = max(1, int(agent_sample_size))
+            self.agent_sample_size = max(
+                1,
+                int(agent_sample_size),
+            )
 
         self.mode = mode
 
@@ -31,16 +59,39 @@ class AssignmentProposal:
                 f"Expected 'guided' or 'random'."
             )
 
+    # ==================================================================
+    # Public API
+    # ==================================================================
+
     def propose(self, state):
         """
         Generate one valid assignment proposal.
 
-        mode="random":
-            Pure random single-task reassignment.
+        Random mode
+        -----------
+        Generates exactly one random single-task reassignment.
 
-        mode="guided":
-            Mixture of guided single swaps, guided block moves,
-            random swaps and occasional exhaustive reassignment.
+        Guided mode
+        -----------
+        Uses a mixture of:
+            - guided single-task reassignment
+            - guided block reassignment
+            - random single-task reassignment
+            - exhaustive single-task reassignment
+
+        The proposal itself does NOT perform Metropolis acceptance.
+        Acceptance is handled exclusively by the sampler.
+
+        Returns
+        -------
+        torch.Tensor
+            Proposed assignment matrix X' with shape [N, M].
+
+        Invariant
+        ---------
+        Every task remains assigned to exactly one agent:
+
+            X'.sum(dim=0) == 1
         """
 
         if self.mode == "random":
@@ -61,22 +112,33 @@ class AssignmentProposal:
             else:
                 X_prop = self._full_single_reassignment(state)
 
+        # --------------------------------------------------------------
         # Avoid no-op proposals whenever possible.
+        # --------------------------------------------------------------
+
         if (
             state.N > 1
             and torch.equal(X_prop, state.X)
         ):
             X_prop = self._random_swap(state)
 
-        self._validate_assignment(state, X_prop)
+        self._validate_assignment(
+            state,
+            X_prop,
+        )
 
         return X_prop
 
-    # ------------------------------------------------------------------
-    # Guided proposals
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Guided proposal selection
+    # ==================================================================
 
     def _guided_single_swap(self, state):
+        """
+        Select promising tasks and find the best single reassignment
+        among the sampled candidate agents.
+        """
+
         tasks = self._select_tasks(
             state,
             self.num_tasks,
@@ -88,6 +150,14 @@ class AssignmentProposal:
         )
 
     def _guided_block_move(self, state):
+        """
+        Sequentially improve a small block of selected tasks.
+
+        This is still a proposal mechanism, not a separate optimization
+        algorithm. The resulting candidate is later evaluated and
+        accepted/rejected by the sampler.
+        """
+
         tasks = self._select_tasks(
             state,
             self.block_size,
@@ -98,19 +168,23 @@ class AssignmentProposal:
             tasks,
         )
 
-    # ------------------------------------------------------------------
+    # ==================================================================
     # Random proposal
-    # ------------------------------------------------------------------
+    # ==================================================================
 
     def _random_swap(self, state):
         """
         Randomly reassign exactly one task to another agent.
 
-        This preserves the invariant:
+        This is the proposal used by pure SA.
+
+        Important:
+            "random" refers only to how X' is generated.
+            The sampler still performs the Metropolis acceptance test.
+
+        Assignment invariant:
 
             X.sum(dim=0) == 1
-
-        for every task.
         """
 
         X_new = state.X.clone()
@@ -121,41 +195,50 @@ class AssignmentProposal:
         if state.N <= 1:
             return X_new
 
-        t = random.randint(
+        # Select one task uniformly at random.
+        task_idx = random.randint(
             0,
             state.M - 1,
         )
 
-        a_old = torch.argmax(
-            state.X[:, t]
+        # Current agent assigned to this task.
+        old_agent = torch.argmax(
+            state.X[:, task_idx]
         ).item()
 
+        # All alternative agents.
         candidates = [
-            a
-            for a in range(state.N)
-            if a != a_old
+            agent_idx
+            for agent_idx in range(state.N)
+            if agent_idx != old_agent
         ]
 
         if not candidates:
             return X_new
 
-        a_new = random.choice(candidates)
+        new_agent = random.choice(
+            candidates
+        )
 
-        X_new[a_old, t] = 0.0
-        X_new[a_new, t] = 1.0
+        # Reassign exactly one task.
+        X_new[old_agent, task_idx] = 0.0
+        X_new[new_agent, task_idx] = 1.0
 
         return X_new
 
-    # ------------------------------------------------------------------
-    # Task selection
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Task selection for guided proposals
+    # ==================================================================
 
     def _select_tasks(self, state, k):
         """
-        Select tasks that currently look most promising for reassignment.
+        Select tasks that currently have high assignment mismatch.
 
-        Higher importance means a task is considered a stronger candidate
-        for modification.
+        The score is based on the currently assigned agent and the
+        task embedding.
+
+        Higher score means that the task is considered a stronger
+        candidate for reassignment.
         """
 
         if state.M <= 0:
@@ -164,47 +247,70 @@ class AssignmentProposal:
         if k >= state.M:
             return list(range(state.M))
 
-        k = max(1, int(k))
+        k = max(
+            1,
+            int(k),
+        )
 
-        assigned = torch.argmax(
+        # Current assignment for every task.
+        assigned_agents = torch.argmax(
             state.X,
             dim=0,
         )
 
-        agent_s = state.s[assigned]
+        # Capability vector of the currently assigned agent.
+        assigned_capabilities = state.s[
+            assigned_agents
+        ]
 
-        dist = torch.sum(
-            (agent_s - state.c) ** 2,
+        # Squared Euclidean mismatch.
+        distance = torch.sum(
+            (
+                assigned_capabilities
+                - state.c
+            ) ** 2,
             dim=1,
         )
 
-        align_sc = torch.sum(
-            agent_s * state.c,
+        # Alignment contribution.
+        alignment = torch.sum(
+            assigned_capabilities
+            * state.c,
             dim=1,
         )
 
+        # Higher value = stronger candidate for reassignment.
         importance = (
-            dist
-            - self.lambda_align * align_sc
+            distance
+            - self.lambda_align * alignment
         )
 
-        _, top_idxs = torch.topk(
+        _, top_indices = torch.topk(
             importance,
             k,
             largest=True,
         )
 
-        return top_idxs.tolist()
+        return top_indices.tolist()
 
-    # ------------------------------------------------------------------
-    # Agent candidates
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Candidate-agent selection
+    # ==================================================================
 
-    def _candidate_agents(self, state, a_old):
+    def _candidate_agents(self, state, old_agent):
+        """
+        Return candidate replacement agents.
+
+        If agent_sample_size is None or larger than the available
+        candidate set, all alternative agents are evaluated.
+
+        Otherwise a random subset is evaluated.
+        """
+
         candidates = [
-            a
-            for a in range(state.N)
-            if a != a_old
+            agent_idx
+            for agent_idx in range(state.N)
+            if agent_idx != old_agent
         ]
 
         if not candidates:
@@ -221,93 +327,123 @@ class AssignmentProposal:
             self.agent_sample_size,
         )
 
-    # ------------------------------------------------------------------
-    # Guided single move
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Guided single-task move
+    # ==================================================================
 
     def _best_swap_among_tasks(self, state, tasks):
-        X_orig = state.X.clone()
+        """
+        Find the best single-task reassignment among the selected tasks.
 
+        The current state is restored before returning.
+        """
+
+        X_orig = state.X.clone()
         best_X = X_orig.clone()
 
         best_E, _ = self.energy_registry.compute(
             state
         )
-
         best_E = best_E.item()
 
-        for t in tasks:
-            a_old = torch.argmax(
-                X_orig[:, t]
+        for task_idx in tasks:
+
+            old_agent = torch.argmax(
+                X_orig[:, task_idx]
             ).item()
 
-            candidates = self._candidate_agents(
+            candidate_agents = self._candidate_agents(
                 state,
-                a_old,
+                old_agent,
             )
 
-            for a_new in candidates:
+            for new_agent in candidate_agents:
+
                 X_prop = X_orig.clone()
 
-                X_prop[a_old, t] = 0.0
-                X_prop[a_new, t] = 1.0
+                X_prop[
+                    old_agent,
+                    task_idx,
+                ] = 0.0
+
+                X_prop[
+                    new_agent,
+                    task_idx,
+                ] = 1.0
 
                 state.X = X_prop
 
                 E, _ = self.energy_registry.compute(
                     state
                 )
-
                 E_val = E.item()
 
                 if E_val < best_E:
                     best_E = E_val
                     best_X = X_prop.clone()
 
+        # Always restore the original state.
         state.X = X_orig
 
         return best_X
 
-    # ------------------------------------------------------------------
+    # ==================================================================
     # Guided block move
-    # ------------------------------------------------------------------
+    # ==================================================================
 
     def _best_block_move(self, state, tasks):
-        X_orig = state.X.clone()
+        """
+        Construct a guided multi-task proposal.
 
+        Tasks are processed sequentially. For each selected task,
+        the locally best alternative agent is chosen according to
+        the current energy.
+
+        The final block candidate is returned to the sampler, which
+        decides whether the complete proposal is accepted.
+        """
+
+        X_orig = state.X.clone()
         X_prop = X_orig.clone()
 
         best_E, _ = self.energy_registry.compute(
             state
         )
-
         best_E = best_E.item()
 
-        for t in tasks:
-            a_old = torch.argmax(
-                X_prop[:, t]
+        for task_idx in tasks:
+
+            old_agent = torch.argmax(
+                X_prop[:, task_idx]
             ).item()
 
-            candidates = self._candidate_agents(
+            candidate_agents = self._candidate_agents(
                 state,
-                a_old,
+                old_agent,
             )
 
             best_local_X = X_prop.clone()
             best_local_E = best_E
 
-            for a_new in candidates:
+            for new_agent in candidate_agents:
+
                 X_trial = X_prop.clone()
 
-                X_trial[a_old, t] = 0.0
-                X_trial[a_new, t] = 1.0
+                X_trial[
+                    old_agent,
+                    task_idx,
+                ] = 0.0
+
+                X_trial[
+                    new_agent,
+                    task_idx,
+                ] = 1.0
 
                 state.X = X_trial
 
                 E, _ = self.energy_registry.compute(
                     state
                 )
-
                 E_val = E.item()
 
                 if E_val < best_local_E:
@@ -319,62 +455,79 @@ class AssignmentProposal:
             if best_local_E < best_E:
                 best_E = best_local_E
 
+        # Restore original state before returning proposal.
         state.X = X_orig
 
         return X_prop
 
-    # ------------------------------------------------------------------
-    # Exhaustive single reassignment
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Exhaustive reassignment
+    # ==================================================================
 
     def _full_single_reassignment(self, state):
-        X_orig = state.X.clone()
+        """
+        Exhaustively search all single-task / alternative-agent moves.
 
+        This is the strongest guided proposal and is intentionally
+        used only occasionally in guided mode.
+        """
+
+        X_orig = state.X.clone()
         best_X = X_orig.clone()
 
         best_E, _ = self.energy_registry.compute(
             state
         )
-
         best_E = best_E.item()
 
-        for t in range(state.M):
-            a_old = torch.argmax(
-                X_orig[:, t]
+        for task_idx in range(state.M):
+
+            old_agent = torch.argmax(
+                X_orig[:, task_idx]
             ).item()
 
-            for a_new in range(state.N):
-                if a_new == a_old:
+            for new_agent in range(state.N):
+
+                if new_agent == old_agent:
                     continue
 
                 X_prop = X_orig.clone()
 
-                X_prop[a_old, t] = 0.0
-                X_prop[a_new, t] = 1.0
+                X_prop[
+                    old_agent,
+                    task_idx,
+                ] = 0.0
+
+                X_prop[
+                    new_agent,
+                    task_idx,
+                ] = 1.0
 
                 state.X = X_prop
 
                 E, _ = self.energy_registry.compute(
                     state
                 )
-
                 E_val = E.item()
 
                 if E_val < best_E:
                     best_E = E_val
                     best_X = X_prop.clone()
 
+        # Restore original state.
         state.X = X_orig
 
         return best_X
 
-    # ------------------------------------------------------------------
-    # Invariant check
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Assignment invariant
+    # ==================================================================
 
     @staticmethod
     def _validate_assignment(state, X):
         """
+        Validate the fundamental assignment invariant.
+
         Every task must be assigned to exactly one agent.
         """
 
@@ -384,8 +537,12 @@ class AssignmentProposal:
             device=X.device,
         )
 
+        column_sums = X.sum(
+            dim=0
+        )
+
         if not torch.allclose(
-            X.sum(dim=0),
+            column_sums,
             expected,
         ):
             raise RuntimeError(
