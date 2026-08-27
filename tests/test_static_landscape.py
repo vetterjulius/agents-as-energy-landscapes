@@ -121,3 +121,16 @@ def test_theta_only_updates_theta_without_memory():
 
     assert not torch.equal(orchestrator.Theta, initial_theta)
     assert torch.equal(orchestrator.kappa, initial_kappa)
+
+
+def test_guided_sa_uses_guided_proposals_without_hybrid_candidates():
+    config = make_config()
+    config["model"]["search_mode"] = "guided_sa"
+    orchestrator = EBMAOOrchestrator(
+        config,
+        initial_state=make_state(),
+        W_risk=torch.zeros(3 * config["model"]["dim"], 1),
+    )
+
+    assert orchestrator.proposal_mechanism.mode == "guided"
+    assert orchestrator.sampler.mode == "sa"

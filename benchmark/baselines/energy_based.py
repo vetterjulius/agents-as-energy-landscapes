@@ -338,6 +338,15 @@ class EnergyPureSAOrchestrator(EnergyBasedOrchestrator):
         )
 
 
+class EnergyGuidedSAOrchestrator(EnergyBasedOrchestrator):
+    def __init__(self, cfg, theta_mode="static"):
+        super().__init__(
+            cfg,
+            search_mode="guided_sa",
+            theta_mode=theta_mode,
+        )
+
+
 class EnergyHybridOrchestrator(EnergyBasedOrchestrator):
     def __init__(self, cfg, theta_mode="static"):
         super().__init__(
