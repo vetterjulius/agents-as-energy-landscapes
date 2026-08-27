@@ -254,6 +254,64 @@ def generate_robustness_episode(episode, seed=42):
     )
 
 
+def generate_regime_switch_episode(
+    episode,
+    seed=42,
+    num_agents=10,
+    num_tasks=25,
+    dim=8,
+    regime_length=10,
+):
+    """Generate recurring A/B regimes with stable within-regime structure."""
+    regime = (episode // regime_length) % 2
+
+    torch.manual_seed(seed)
+    random.seed(seed)
+    base_s = torch.randn(num_agents, dim)
+    tasks_a = torch.randn(num_tasks, dim)
+    tasks_b = tasks_a.roll(shifts=1, dims=1) + 0.5
+
+    interaction_a = torch.zeros(num_tasks, num_tasks)
+    interaction_b = torch.zeros(num_tasks, num_tasks)
+    for start in range(0, num_tasks - 1, 2):
+        interaction_a[start, start + 1] = 1.0
+        interaction_a[start + 1, start] = 1.0
+    for start in range(0, num_tasks - 2, 3):
+        interaction_b[start, start + 2] = 1.0
+        interaction_b[start + 2, start] = 1.0
+
+    tasks = tasks_a if regime == 0 else tasks_b
+    interaction_graph = interaction_a if regime == 0 else interaction_b
+    agents = [
+        Agent(
+            id=f"agent_{agent_idx}",
+            role="regime_agent",
+            capability_embedding=base_s[agent_idx].clone(),
+        )
+        for agent_idx in range(num_agents)
+    ]
+    task_list = [
+        Task(
+            id=f"task_{task_idx}",
+            embedding=tasks[task_idx].clone(),
+            estimated_cost=1.0,
+        )
+        for task_idx in range(num_tasks)
+    ]
+
+    co_assignment_costs = torch.zeros(num_tasks, num_tasks)
+    risk_weights = torch.randn(3 * dim, 1)
+
+    return ProblemInstance(
+        agents=agents,
+        tasks=task_list,
+        interaction_graph=interaction_graph.clone(),
+        co_assignment_costs=co_assignment_costs,
+        risk_weights=risk_weights,
+        constraints={"regime": regime},
+    )
+
+
 # ----------------------------------------------------------------------
 # 2. Multi-Episode Simulation Engine
 # ----------------------------------------------------------------------
