@@ -363,6 +363,7 @@ class MultiEpisodeSimulator:
                     "hybrid_cleanup_prob": 0.0,
                     "local_refine_steps": 1,           # Fast local search
                     "theta_mode": base_cfg["model"]["theta_mode"],
+                    "memory_mode": "dynamic" if kappa_enabled else "static",
                     "search_mode": "hybrid"
                 }
             }

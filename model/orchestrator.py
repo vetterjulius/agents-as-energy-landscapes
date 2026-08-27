@@ -39,6 +39,10 @@ class Orchestrator:
 
         # modes
         self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
+        self.memory_mode = m.get(
+            "memory_mode",
+            "dynamic" if self.theta_mode != "static" else "static",
+        )
         self.search_mode = m.get("search_mode", "hybrid")  # "hybrid", "pure_sa", "pure_greedy"
 
         # guided proposal config
@@ -183,11 +187,15 @@ class Orchestrator:
                     if improved:
                         self.state.X = best_X
 
-        if self.theta_mode != "static":
-            self.theta_updater.apply(self.state)
-        self.memory_updater.apply(self.state, self.risk_predictor)
+        self._update_adaptive_state()
         if self.search_mode != "pure_greedy":
             self.temperature_controller.apply(self.sampler)
+
+    def _update_adaptive_state(self):
+        if self.theta_mode != "static":
+            self.theta_updater.apply(self.state)
+        if self.memory_mode != "static" and self.eta_memory > 0.0:
+            self.memory_updater.apply(self.state, self.risk_predictor)
 
     def total_energy(self):
         total, _ = self.energy_registry.compute(self.state)
@@ -266,8 +274,7 @@ class Orchestrator:
             if not improved:
                 break
             self.state.X = best_X
-            self.theta_updater.apply(self.state)
-            self.memory_updater.apply(self.state, self.risk_predictor)
+            self._update_adaptive_state()
 
     def _local_refine(self, max_iters=2):
         for _ in range(max_iters):
@@ -297,8 +304,7 @@ class Orchestrator:
 
         self.state.X = X_init
         if not torch.equal(self.state.X, original_X):
-            self.theta_updater.apply(self.state)
-            self.memory_updater.apply(self.state, self.risk_predictor)
+            self._update_adaptive_state()
 
     def log(self, step):
         E, _ = self.energy_registry.compute(self.state)
