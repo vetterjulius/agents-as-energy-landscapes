@@ -361,6 +361,7 @@ class MultiEpisodeSimulator:
         memory_retention=1.0,
         theta_retention=1.0,
         adaptive_retention=False,
+        reference_energy_fn=None,
     ):
         """
         Runs the simulation across episodes and tracks all historical metrics.
@@ -486,6 +487,11 @@ class MultiEpisodeSimulator:
 
             # Evaluate metrics on physical/real environment
             energy, _ = compute_energy(problem, X_final)
+            reference_energy = (
+                reference_energy_fn(problem)
+                if reference_energy_fn is not None
+                else None
+            )
             internal_energy, _ = compute_energy(
                 problem,
                 X_final,
@@ -511,6 +517,12 @@ class MultiEpisodeSimulator:
                 "energy": energy,
                 "external_energy": energy,
                 "internal_energy": internal_energy,
+                "reference_energy": reference_energy,
+                "absolute_gap": (
+                    energy - reference_energy
+                    if reference_energy is not None
+                    else None
+                ),
                 "load_balance": lb,
                 "coordination": coord,
                 "conflicts": conf,

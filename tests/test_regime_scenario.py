@@ -6,6 +6,8 @@ from benchmark.dynamic_benchmark import (
     generate_regime_switch_episode,
 )
 from benchmark.evaluation.metrics import compute_energy
+from benchmark.evaluation.metrics import brute_force_optimum
+from benchmark.scenarios.interaction import InteractionScenario
 
 
 def test_regime_switch_repeats_structured_regimes():
@@ -114,3 +116,21 @@ def test_energy_evaluation_can_use_adaptive_state():
     )
 
     assert ground_truth_energy != adaptive_energy
+
+
+def test_dynamic_runner_can_record_reference_gaps():
+    scenario = InteractionScenario(num_agents=2, num_tasks=3, dim=2)
+    history = MultiEpisodeSimulator(
+        lambda episode, seed: scenario.generate(seed + episode),
+        num_episodes=2,
+        seed=7,
+    ).run(
+        config_override={"solver": {"iterations": 1}},
+        kappa_enabled=False,
+        theta_enabled=False,
+        search_mode="pure_sa",
+        reference_energy_fn=brute_force_optimum,
+    )
+
+    assert history.reference_energy.notna().all()
+    assert history.absolute_gap.notna().all()
