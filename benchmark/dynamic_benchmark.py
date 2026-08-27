@@ -254,6 +254,36 @@ def generate_robustness_episode(episode, seed=42):
     )
 
 
+def context_similarity(current_embeddings, current_interactions, previous_context):
+    """Return a bounded similarity score for consecutive episode contexts."""
+    if previous_context is None:
+        return 1.0
+
+    previous_embeddings, previous_interactions = previous_context
+    def cosine_or_equal(first, second):
+        first_norm = first.norm().item()
+        second_norm = second.norm().item()
+        if first_norm == 0.0 or second_norm == 0.0:
+            return 1.0 if first_norm == second_norm else 0.0
+        return torch.nn.functional.cosine_similarity(
+            first.unsqueeze(0),
+            second.unsqueeze(0),
+        ).item()
+
+    current_embedding_summary = current_embeddings.mean(dim=0)
+    previous_embedding_summary = previous_embeddings.mean(dim=0)
+    embedding_similarity = cosine_or_equal(
+        current_embedding_summary,
+        previous_embedding_summary,
+    )
+
+    current_graph = current_interactions.flatten()
+    previous_graph = previous_interactions.flatten()
+    graph_similarity = cosine_or_equal(current_graph, previous_graph)
+
+    return max(0.0, min(1.0, 0.5 * (embedding_similarity + graph_similarity)))
+
+
 def generate_regime_switch_episode(
     episode,
     seed=42,
@@ -328,6 +358,9 @@ class MultiEpisodeSimulator:
         kappa_enabled=True,
         theta_enabled=True,
         search_mode="hybrid",
+        memory_retention=1.0,
+        theta_retention=1.0,
+        adaptive_retention=False,
     ):
         """
         Runs the simulation across episodes and tracks all historical metrics.
@@ -359,6 +392,7 @@ class MultiEpisodeSimulator:
         carried_kappa = {}  # agent_id -> kappa_vector
         carried_Theta = None # Tensor
         carried_running_co = None
+        previous_context = None
 
         history = []
         prev_X = None
@@ -373,16 +407,23 @@ class MultiEpisodeSimulator:
 
             s = torch.stack([a.capability_embedding for a in problem.agents])
             c = torch.stack([t.embedding for t in problem.tasks])
+            context_factor = (
+                context_similarity(c, problem.interaction_graph, previous_context)
+                if adaptive_retention
+                else 1.0
+            )
+            effective_memory_retention = memory_retention * context_factor
+            effective_theta_retention = theta_retention * context_factor
 
             # Reconstruct carrying-over memory
             kappa = torch.zeros(N, d)
             for i, a in enumerate(problem.agents):
                 if a.id in carried_kappa:
-                    kappa[i] = carried_kappa[a.id]
+                    kappa[i] = effective_memory_retention * carried_kappa[a.id]
 
             # Reconstruct carrying-over structural dependencies (Theta)
             if theta_enabled and carried_Theta is not None and carried_Theta.shape == (M, M):
-                Theta = carried_Theta.clone()
+                Theta = effective_theta_retention * carried_Theta
             else:
                 Theta = problem.interaction_graph.clone()
 
@@ -445,6 +486,12 @@ class MultiEpisodeSimulator:
 
             # Evaluate metrics on physical/real environment
             energy, _ = compute_energy(problem, X_final)
+            internal_energy, _ = compute_energy(
+                problem,
+                X_final,
+                kappa=orchestrator.state.kappa,
+                theta=orchestrator.state.Theta,
+            )
             lb = load_balance(X_final)
             coord = coordination_score(problem, X_final)
             conf = constraint_violations(problem, X_final)
@@ -462,6 +509,8 @@ class MultiEpisodeSimulator:
             history.append({
                 "episode": ep,
                 "energy": energy,
+                "external_energy": energy,
+                "internal_energy": internal_energy,
                 "load_balance": lb,
                 "coordination": coord,
                 "conflicts": conf,
@@ -470,7 +519,8 @@ class MultiEpisodeSimulator:
                 "communication_cost": comm,
                 "conflict_rate": confr,
                 "reconfig_cost": reconfig,
-                "kappa_norm": float(orchestrator.state.kappa.norm().item())
+                "kappa_norm": float(orchestrator.state.kappa.norm().item()),
+                "context_similarity": context_factor,
             })
 
             # Save memories to carry over
@@ -483,6 +533,7 @@ class MultiEpisodeSimulator:
                 carried_running_co = orchestrator.theta_updater.running_co
             else:
                 carried_running_co = None
+            previous_context = (c.clone(), problem.interaction_graph.clone())
             prev_X = X_final.clone()
 
         return pd.DataFrame(history)

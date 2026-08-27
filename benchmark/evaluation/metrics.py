@@ -12,11 +12,14 @@ def compute_energy(
     problem,
     X,
     energy_cfg=None,
+    kappa=None,
+    theta=None,
 ):
     energy_cfg = energy_cfg or {}
 
     interaction_weight = energy_cfg.get("interaction_weight", 1.0)
     lambda_align = energy_cfg.get("lambda_align", 0.5)
+    lambda_memory = energy_cfg.get("lambda_memory", lambda_align)
     cost_weight = energy_cfg.get("cost_weight", 1.0)
     risk_weight = energy_cfg.get("risk_weight", 1.0)
 
@@ -28,8 +31,8 @@ def compute_energy(
         X=X,
         s=torch.stack([a.capability_embedding for a in problem.agents]),
         c=torch.stack([t.embedding for t in problem.tasks]),
-        kappa=torch.zeros(N, d),
-        Theta=problem.interaction_graph,
+        kappa=torch.zeros(N, d) if kappa is None else kappa,
+        Theta=problem.interaction_graph if theta is None else theta,
         C=problem.co_assignment_costs,
         N=N,
         M=M,
@@ -46,6 +49,7 @@ def compute_energy(
     registry.add(
         AssignmentEnergy(
             lambda_align=lambda_align,
+            lambda_memory=lambda_memory,
             weight=1.0,
         )
     )
