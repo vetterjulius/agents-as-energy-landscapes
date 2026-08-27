@@ -264,7 +264,13 @@ class MultiEpisodeSimulator:
         self.num_episodes = num_episodes
         self.seed = seed
 
-    def run(self, config_override=None, kappa_enabled=True, theta_enabled=True):
+    def run(
+        self,
+        config_override=None,
+        kappa_enabled=True,
+        theta_enabled=True,
+        search_mode="hybrid",
+    ):
         """
         Runs the simulation across episodes and tracks all historical metrics.
         """
@@ -364,7 +370,7 @@ class MultiEpisodeSimulator:
                     "local_refine_steps": 1,           # Fast local search
                     "theta_mode": base_cfg["model"]["theta_mode"],
                     "memory_mode": "dynamic" if kappa_enabled else "static",
-                    "search_mode": "hybrid"
+                    "search_mode": search_mode,
                 }
             }
 

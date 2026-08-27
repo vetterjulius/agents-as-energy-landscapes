@@ -143,6 +143,9 @@ def run_experiment(
 
             for o_name, orchestrator in orchestrators.items():
                 start_time = time.perf_counter()
+                torch.manual_seed(seed)
+                random.seed(seed)
+                np.random.seed(seed)
 
                 try:
                     X = orchestrator.solve(problem)
@@ -170,10 +173,10 @@ def run_experiment(
                     metrics["conflict_rate"].append(confr)
 
                 except Exception as e:
-                    print(
-                        f"      [ERROR] {o_name} failed "
-                        f"on seed {seed}: {e}"
-                    )
+                    raise RuntimeError(
+                        f"{experiment_name}: {o_name} failed "
+                        f"on scenario {s_name}, seed {seed}"
+                    ) from e
 
     return all_results
 
@@ -413,14 +416,28 @@ def run_benchmark(quick: bool = False):
         base_seed,
     )
 
+    ebmao_cfg = cfg.get("ebmao", {})
+    ablation_cfg = deep_merge_config(
+        cfg,
+        {
+            "solver": {
+                "iterations": exp1_iterations,
+                "temperature_init": ebmao_cfg.get("temperature_init", 4.0),
+                "min_temperature": ebmao_cfg.get("min_temperature", 1.0),
+                "max_temperature": ebmao_cfg.get("max_temperature", 6.0),
+                "target_accept_rate": ebmao_cfg.get("target_accept_rate", 0.3),
+            }
+        },
+    )
+
     rep_ablation_results = run_representation_ablations(
         interaction_problem,
-        cfg,
+        ablation_cfg,
     )
 
     sol_ablation_results = run_solver_ablations(
         interaction_problem,
-        cfg,
+        ablation_cfg,
     )
 
     # ------------------------------------------------------------
@@ -456,19 +473,19 @@ def run_benchmark(quick: bool = False):
     # ------------------------------------------------------------
     if cfg.get("run_scale_sweep", True):
         print("\nRunning Scale Sweep Experiment...")
-        run_scale_sweep(cfg)
+        run_scale_sweep()
     else:
         print("\nSkipping Scale Sweep Experiment.")
 
     if cfg.get("run_coupling_sweep", True):
         print("\nRunning Coupling Sweep Experiment...")
-        run_coupling_sweep(cfg)
+        run_coupling_sweep()
     else:
         print("\nSkipping Coupling Sweep Experiment.")
 
     if cfg.get("run_dynamic_benchmark", True):
         print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
-        run_dynamic_benchmark(cfg)
+        run_dynamic_benchmark()
     else:
         print("\nSkipping Dynamic & Long-Horizon Adaptation Benchmark.")
 

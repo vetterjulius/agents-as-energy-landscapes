@@ -181,7 +181,7 @@ def plot_results(all_results, output_dir="results/plots"):
         weights = [d['weight'] * 2 for u, v, d in edges]
         nx.draw_networkx_edges(G_tasks, pos_tasks, width=weights, edge_color='gray', alpha=0.7)
 
-    plt.title("Task Synergy & Dependency Network ($\Theta$ matrix)", fontsize=14, fontweight='bold')
+    plt.title("Task Synergy & Dependency Network ($\\Theta$ matrix)", fontsize=14, fontweight='bold')
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(f"{output_dir}/task_dependency_graph.png")

@@ -9,7 +9,6 @@ This document compiles and structures all figures generated during the benchmark
 4. [Conflict and Constraint Violations](#4-conflict-and-constraint-violations)
 5. [Pareto-Plot (Runtime vs. Energy)](#5-pareto-plot-runtime-vs-energy)
 6. [Emergent Networks & Heatmaps](#6-emergent-networks--heatmaps)
-7. [Dynamic Adaptation & Long-Horizon Learning](#7-dynamic-adaptation--long-horizon-learning)
 
 ## 1. Energy and Optimization Landscapes
 
@@ -142,36 +141,3 @@ These plots show the energy profiles across different scenarios. Minimizing ener
 - **What this shows**: Bipartite graph mapping agents directly to their assigned tasks, with edge colors representing capability similarity.
 - **Analysis**: Provides a direct, intuitive visual representation of the final orchestration layout.
 
-
-
-## 7. Dynamic Adaptation & Long-Horizon Learning
-
-These plots visually represent EBMAO's capability to reshape and learn the energy landscape over time.
-
-### Dynamic Adaptation Learning Curves
-![Dynamic Adaptation Curves](plots/dynamic_adaptation_curves.png)
-
-**Interpretation**:
-- **What this shows**: Landscape energy trajectories over 50 episodes under capability drift, task shift, and changing dependencies. Red dashed line marks the exact episode where the environment abruptly shifts.
-- **Analysis**: Full EBMAO (green curve) shows immediate recovery after perturbations, returning to near-optimal energy in 1-3 episodes. The Static Energy model (orange curve) fails to adapt, exhibiting a permanent performance penalty or high-energy state.
-
-### Emergent Role Specialization
-![Emergent Specialization Curves](plots/dynamic_specialization_curves.png)
-
-**Interpretation**:
-- **What this shows**: Specialization degree (cosine similarity between assigned agents and tasks) over an 80-cycle horizon.
-- **Analysis**: Shows specialization emergence. Over time, EBMAO's adaptive memory updates guide agents to self-organize into specific roles, raising the specialization degree from ~0.25 to >0.75, while the static baseline remains completely flat.
-
-### Non-Stationary Robustness Profile
-![Robustness Profile](plots/dynamic_robustness_curves.png)
-
-**Interpretation**:
-- **What this shows**: System survival and energy recovery under compound perturbations (agent failure/degradation at ep 25, new agent joining at ep 38).
-- **Analysis**: Proves that EBMAO is highly resilient: it absorbs agent loss with a small, temporary energy increase and immediately integrates new agents into the optimal orchestration layout, whereas static models remain highly sub-optimal.
-
-### Quantitative Adaptation Comparison
-![Adaptation Speed and Regret](plots/dynamic_adaptation_bars.png)
-
-**Interpretation**:
-- **What this shows**: Average Recovery Time (episodes) and Cumulative Regret across all non-stationary scenarios.
-- **Analysis**: Full EBMAO reduces recovery time from >20 episodes to <3 episodes on average and cuts cumulative regret by over 70%, proving the extreme scientific benefits of active landscape learning.
