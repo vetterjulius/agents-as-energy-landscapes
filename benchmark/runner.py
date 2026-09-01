@@ -3,7 +3,7 @@ import random
 import time
 import copy
 import numpy as np
-from benchmark.config import config
+from benchmark.config import config, quick_config
 from benchmark.scenarios.independent import IndependentScenario
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.scenarios.dynamic import DynamicScenario
@@ -37,6 +37,27 @@ from benchmark.ablations import run_representation_ablations, run_solver_ablatio
 from benchmark.scale_sweep import run_scale_sweep
 from benchmark.coupling_sweep import run_coupling_sweep
 from benchmark.dynamic_benchmark import run_dynamic_benchmark
+
+def deep_merge_config(base, overrides):
+    """
+    Recursively merge overrides into a copy of base.
+
+    Nested dictionaries are merged recursively.
+    Lists and scalar values are replaced completely.
+    """
+    result = copy.deepcopy(base)
+
+    for key, value in overrides.items():
+        if (
+            key in result
+            and isinstance(result[key], dict)
+            and isinstance(value, dict)
+        ):
+            result[key] = deep_merge_config(result[key], value)
+        else:
+            result[key] = copy.deepcopy(value)
+
+    return result
 
 def apply_robustness_perturbations(problem, seed, cfg):
     """
@@ -79,74 +100,24 @@ def apply_robustness_perturbations(problem, seed, cfg):
 
     return perturbed
 
-def run_benchmark():
-    print("Starting Energy-Based Orchestration Benchmark (EOB)...")
+def run_experiment(
+    experiment_name,
+    scenarios,
+    orchestrators,
+    base_seed,
+    num_seeds,
+    config,
+):
+    print(f"\n{'=' * 70}")
+    print(f"Starting experiment: {experiment_name}")
+    print(f"{'=' * 70}")
 
-    if "model" not in config:
-        config["model"] = {}
-    """
-    config["model"].update({
-        "warm_start_steps": 0,
-        "local_refine_steps": 0,
-        "proposal_candidates": 2,
-        "proposal_task_sample": 2,
-        "agent_sample_size": 2,
-        "block_move_size": 1,
-        "hybrid_cleanup_prob": 0.0
-    })
-    """
-    
-
-    # Load base seed
-    base_seed = config.get("seed", 42)
-    num_seeds = config.get("num_evaluation_seeds", 30)
-    print(f"Configured to run {num_seeds} seeds per scenario.")
-
-    # Instantiate Scenarios (using config dimensions)
-    dim = config.get("dim", 8)
-    n_agents = config.get("num_agents", 5)
-    n_tasks = config.get("num_tasks", 10)
-
-    scenarios = {
-        "Independent": IndependentScenario(num_agents=n_agents, num_tasks=n_tasks, dim=dim),
-        "Interaction": InteractionScenario(num_agents=n_agents, num_tasks=n_tasks, dim=dim),
-        "Dynamic": DynamicScenario(num_agents=n_agents, num_tasks=n_tasks, dim=dim),
-        "DistributionShift": DistributionShiftScenario(dim=dim), # Custom size inside for scale shifts
-        "Frustrated": FrustratedScenario(dim=dim)
-    }
-
-    # Instantiate Orchestrators (Baselines + Primary Energy Landscape methods)
-    orchestrators = {
-        # Standard Baselines
-        "Random": RandomOrchestrator(),
-        "Capability Matching (Greedy)": GreedyOrchestrator(),
-        "GreedyLB": GreedyLoadBalancingOrchestrator(),
-        "RuleBased": RuleBasedOrchestrator(),
-
-        # New Classical Optimization Baselines
-        "Beam Search": BeamSearchOrchestrator(beam_width=config.get("beam_search", {}).get("beam_width", 5)),
-        "Tabu Search": TabuSearchOrchestrator(
-            max_iterations=config.get("tabu_search", {}).get("max_iterations", 50),
-            tabu_tenure=config.get("tabu_search", {}).get("tabu_tenure", 5)
-        ),
-
-        # Energy Landscape Solvers
-        "Energy (Pure Greedy)": EnergyPureGreedyOrchestrator(config),
-        "Energy (Pure SA)": EnergyPureSAOrchestrator(config),
-        "Energy (Hybrid)": EnergyHybridOrchestrator(config),
-        "EBMAO (Pure Greedy)": EBMAOPureGreedyOrchestrator(config),
-        "EBMAO (Pure SA)": EBMAOPureSAOrchestrator(config),
-        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(config)
-    }
-
-    # Results structure to accumulate multi-seed metrics
     all_results = {}
 
     for s_name, scenario in scenarios.items():
         print(f"\n  Running Scenario: {s_name} ({num_seeds} seeds)")
         all_results[s_name] = {}
 
-        # Initialize lists for each orchestrator
         for o_name in orchestrators.keys():
             all_results[s_name][o_name] = {
                 "energy": [],
@@ -157,38 +128,40 @@ def run_benchmark():
                 "specialization": [],
                 "task_clustering": [],
                 "communication_cost": [],
-                "conflict_rate": []
+                "conflict_rate": [],
             }
 
-        # Multi-seed evaluation loop
         for run_idx in range(num_seeds):
             seed = base_seed + run_idx
 
-            # Generate unperturbed scenario problem instance
             base_problem = scenario.generate(seed)
-
-            # Apply robustness perturbations if configured
-            problem = apply_robustness_perturbations(base_problem, seed, config)
+            problem = apply_robustness_perturbations(
+                base_problem,
+                seed,
+                config,
+            )
 
             for o_name, orchestrator in orchestrators.items():
                 start_time = time.perf_counter()
+                torch.manual_seed(seed)
+                random.seed(seed)
+                np.random.seed(seed)
+
                 try:
                     X = orchestrator.solve(problem)
                     elapsed = time.perf_counter() - start_time
 
-                    # Compute all metrics on the perturbed problem (surviving environment)
                     energy, _ = compute_energy(problem, X)
                     lb = load_balance(X)
                     coord = coordination_score(problem, X)
                     conf = constraint_violations(problem, X)
-
                     spec = specialization_degree(problem, X)
                     clust = task_clustering(problem, X)
                     comm = communication_cost(problem, X)
                     confr = conflict_rate(problem, X)
 
-                    # Accumulate
                     metrics = all_results[s_name][o_name]
+
                     metrics["energy"].append(energy)
                     metrics["load_balance"].append(lb)
                     metrics["coordination"].append(coord)
@@ -198,43 +171,354 @@ def run_benchmark():
                     metrics["task_clustering"].append(clust)
                     metrics["communication_cost"].append(comm)
                     metrics["conflict_rate"].append(confr)
+
                 except Exception as e:
-                    print(f"      [ERROR] {o_name} failed on seed {seed}: {e}")
+                    raise RuntimeError(
+                        f"{experiment_name}: {o_name} failed "
+                        f"on scenario {s_name}, seed {seed}"
+                    ) from e
 
-    # Run Ablations on Interaction Scenario
+    return all_results
+
+def run_benchmark(quick: bool = False):
+    print("=" * 70)
+    print("Energy-Based Orchestration Benchmark")
+    print("=" * 70)
+
+    # ------------------------------------------------------------
+    # Select configuration
+    # ------------------------------------------------------------
+    if quick:
+        cfg = deep_merge_config(config, quick_config)
+        mode = "QUICK (validation only)"
+    else:
+        cfg = copy.deepcopy(config)
+        mode = "FULL"
+
+    # ------------------------------------------------------------
+    # Global benchmark configuration
+    # ------------------------------------------------------------
+    base_seed = cfg.get("seed", 42)
+    num_seeds = cfg.get("num_evaluation_seeds", 30)
+
+    print(f"\nMode: {mode}")
+    print(f"Seeds per scenario: {num_seeds}")
+    print(f"Base random seed: {base_seed}")
+
+    # ------------------------------------------------------------
+    # Problem configuration
+    # ------------------------------------------------------------
+    problem_cfg = cfg.get("problem", {})
+
+    dim = problem_cfg.get("dim", 8)
+    n_agents = problem_cfg.get("num_agents", 5)
+    n_tasks = problem_cfg.get("num_tasks", 10)
+
+    print(f"\nProblem configuration:")
+    print(f"  Agents: {n_agents}, Tasks: {n_tasks}, Embedding dim: {dim}")
+
+    exp1_iter = cfg.get("experiment_1", {}).get("iterations", 100)
+    exp2_iter = cfg.get("experiment_2", {}).get("iterations", 100)
+    print(f"\nSolver iterations:")
+    print(f"  Experiment 1 (World): {exp1_iter}")
+    print(f"  Experiment 2 (Solver Battle): {exp2_iter}")
+
+    # ------------------------------------------------------------
+    # Instantiate scenarios
+    # ------------------------------------------------------------
+    scenarios = {
+        "Independent": IndependentScenario(
+            num_agents=n_agents,
+            num_tasks=n_tasks,
+            dim=dim,
+        ),
+        "Interaction": InteractionScenario(
+            num_agents=n_agents,
+            num_tasks=n_tasks,
+            dim=dim,
+        ),
+        "Frustrated": FrustratedScenario(
+            num_agents=n_agents,
+            num_tasks=n_tasks,
+            dim=dim,
+        ),
+    }
+
+    # ------------------------------------------------------------
+    # Experiment 1
+    #
+    # Main comparison:
+    #   classical baselines
+    #   Energy
+    #   EBMAO
+    #
+    # The experiment configuration is decided here and passed
+    # explicitly to the proposed-system adapters.
+    # ------------------------------------------------------------
+    exp1_cfg = cfg.get("experiment_1", {})
+
+    exp1_iterations = exp1_cfg.get("iterations", 100)
+    exp1_solver = exp1_cfg.get("energy_solver", "hybrid")
+
+    experiment_1_cfg = deep_merge_config(
+        cfg,
+        {
+            "iterations": exp1_iterations,
+            "solver": {},
+        },
+    )
+
+    # ------------------------------------------------------------
+    # Experiment 1 classical baseline parameters
+    #
+    # Beam/Tabu are configured globally under experiment_2 because
+    # they are solver-comparison baselines.
+    # ------------------------------------------------------------
+    exp2_cfg = cfg.get("experiment_2", {})
+
+    beam_cfg = exp2_cfg.get("beam_search", {})
+    tabu_cfg = exp2_cfg.get("tabu_search", {})
+
+    world_baselines = {
+        "Random": RandomOrchestrator(),
+
+        "Capability Matching (Greedy)": GreedyOrchestrator(),
+
+        "GreedyLB": GreedyLoadBalancingOrchestrator(),
+
+        "RuleBased": RuleBasedOrchestrator(),
+
+        "Beam Search": BeamSearchOrchestrator(
+            beam_width=beam_cfg.get("beam_width", 5),
+        ),
+
+        "Tabu Search": TabuSearchOrchestrator(
+            max_iterations=tabu_cfg.get(
+                "max_iterations",
+                50,
+            ),
+            tabu_tenure=tabu_cfg.get(
+                "tabu_tenure",
+                5,
+            ),
+        ),
+
+        "Energy (Hybrid)": EnergyHybridOrchestrator(
+            experiment_1_cfg,
+        ),
+
+        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(
+            experiment_1_cfg,
+        ),
+    }
+
+    # ------------------------------------------------------------
+    # Experiment 2
+    #
+    # Solver battle on the same energy landscape.
+    #
+    # The runner explicitly selects the solver-specific config
+    # and passes it to the corresponding adapter.
+    # ------------------------------------------------------------
+    exp2_iterations = exp2_cfg.get("iterations", 100)
+
+    def build_solver_config(solver_name):
+        solver_specific_cfg = exp2_cfg.get(
+            solver_name,
+            {},
+        )
+
+        return deep_merge_config(
+            cfg,
+            {
+                "iterations": exp2_iterations,
+                "solver": solver_specific_cfg,
+            },
+        )
+
+    energy_greedy_cfg = build_solver_config(
+        "energy_greedy",
+    )
+
+    energy_sa_cfg = build_solver_config(
+        "energy_sa",
+    )
+
+    energy_hybrid_cfg = build_solver_config(
+        "energy_hybrid",
+    )
+
+    # EBMAO uses the same solver-comparison structure.
+    #
+    # There are currently no separate EBMAO-specific sections in
+    # config.py, so the shared experiment_2 iteration count is used.
+    ebmao_greedy_cfg = build_solver_config(
+        "energy_greedy",
+    )
+
+    ebmao_sa_cfg = build_solver_config(
+        "energy_sa",
+    )
+
+    ebmao_hybrid_cfg = build_solver_config(
+        "energy_hybrid",
+    )
+
+    energy_solver_battle = {
+        "Energy (Pure Greedy)": EnergyPureGreedyOrchestrator(
+            energy_greedy_cfg,
+        ),
+
+        "Energy (Pure SA)": EnergyPureSAOrchestrator(
+            energy_sa_cfg,
+        ),
+
+        "Energy (Hybrid)": EnergyHybridOrchestrator(
+            energy_hybrid_cfg,
+        ),
+
+        "EBMAO (Pure Greedy)": EBMAOPureGreedyOrchestrator(
+            ebmao_greedy_cfg,
+        ),
+
+        "EBMAO (Pure SA)": EBMAOPureSAOrchestrator(
+            ebmao_sa_cfg,
+        ),
+
+        "EBMAO (Hybrid)": EBMAOHybridOrchestrator(
+            ebmao_hybrid_cfg,
+        ),
+    }
+
+    # ------------------------------------------------------------
+    # Run Experiment 1
+    # ------------------------------------------------------------
+    world_results = run_experiment(
+        experiment_name="EOB: Energy/EBMAO vs Classical Baselines",
+        scenarios=scenarios,
+        orchestrators=world_baselines,
+        base_seed=base_seed,
+        num_seeds=num_seeds,
+        config=cfg,
+    )
+
+    # ------------------------------------------------------------
+    # Run Experiment 2
+    # ------------------------------------------------------------
+    solver_results = run_experiment(
+        experiment_name="Solver Battle: Energy Landscape Solvers",
+        scenarios=scenarios,
+        orchestrators=energy_solver_battle,
+        base_seed=base_seed,
+        num_seeds=num_seeds,
+        config=cfg,
+    )
+
+    # ------------------------------------------------------------
+    # Ablations
+    # ------------------------------------------------------------
     print("\n  Running Ablations on Interaction Scenario...")
-    interaction_problem = scenarios["Interaction"].generate(base_seed)
-    rep_ablation_results = run_representation_ablations(interaction_problem, config)
-    sol_ablation_results = run_solver_ablations(interaction_problem, config)
 
-    # Reporting and Plots
-    print("\nGenerating comprehensive paper-ready reports and plots...")
-    generate_markdown_report(all_results)
-    save_csv_results(all_results)
-    plot_results(all_results)
+    interaction_problem = scenarios["Interaction"].generate(
+        base_seed,
+    )
 
-    # Console summary of ablations
+    ebmao_cfg = cfg.get("ebmao", {})
+    ablation_cfg = deep_merge_config(
+        cfg,
+        {
+            "solver": {
+                "iterations": exp1_iterations,
+                "temperature_init": ebmao_cfg.get("temperature_init", 4.0),
+                "min_temperature": ebmao_cfg.get("min_temperature", 1.0),
+                "max_temperature": ebmao_cfg.get("max_temperature", 6.0),
+                "target_accept_rate": ebmao_cfg.get("target_accept_rate", 0.3),
+            }
+        },
+    )
+
+    rep_ablation_results = run_representation_ablations(
+        interaction_problem,
+        ablation_cfg,
+    )
+
+    sol_ablation_results = run_solver_ablations(
+        interaction_problem,
+        ablation_cfg,
+    )
+
+    # ------------------------------------------------------------
+    # Reporting
+    # ------------------------------------------------------------
+    print("\nGenerating report for Experiment 1...")
+
+    generate_markdown_report(world_results)
+    save_csv_results(world_results)
+    plot_results(world_results)
+
+    print("\nGenerating report for Experiment 2...")
+
+    generate_markdown_report(solver_results)
+    save_csv_results(solver_results)
+    plot_results(solver_results)
+
+    # ------------------------------------------------------------
+    # Ablation summary
+    # ------------------------------------------------------------
     print("\nRepresentation Ablation Results (Interaction Scenario):")
+
     for name, energy in rep_ablation_results.items():
         print(f"  {name}: {energy:.4f}")
 
     print("\nSolver Ablation Results (Interaction Scenario):")
+
     for name, energy in sol_ablation_results.items():
         print(f"  {name}: {energy:.4f}")
 
-    # Run Scaling Sweep
-    print("\nRunning Scale Sweep Experiment...")
-    run_scale_sweep()
+    # ------------------------------------------------------------
+    # Additional experiments
+    # ------------------------------------------------------------
+    if cfg.get("run_scale_sweep", True):
+        print("\nRunning Scale Sweep Experiment...")
+        run_scale_sweep()
+    else:
+        print("\nSkipping Scale Sweep Experiment.")
 
-    # Run Coupling Sweep
-    print("\nRunning Coupling Sweep Experiment...")
-    run_coupling_sweep()
+    if cfg.get("run_coupling_sweep", True):
+        print("\nRunning Coupling Sweep Experiment...")
+        run_coupling_sweep()
+    else:
+        print("\nSkipping Coupling Sweep Experiment.")
 
-    # Run Dynamic & Long-Horizon Learning Adaptation Benchmark (EBMAO specific properties)
-    print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
-    run_dynamic_benchmark()
+    if cfg.get("run_dynamic_benchmark", True):
+        print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
+        run_dynamic_benchmark()
+    else:
+        print("\nSkipping Dynamic & Long-Horizon Adaptation Benchmark.")
 
-    print("\nBenchmark Complete. Results and figures saved in results/")
+    # Final summary
+    print("\n" + "=" * 70)
+    print("Benchmark Complete")
+    print("=" * 70)
+    print("Results saved to:")
+    print("  - results/benchmark_results.csv (raw per-run data)")
+    print("  - results/benchmark_results_summary.csv (aggregated)")
+    print("  - results/benchmark_report.md (markdown report)")
+    print("  - results/figure_catalog.md (figure descriptions)")
+    print("  - results/plots/ (all visualization figures)")
+    print("  - results/ebmao_vs_world_20seeds.csv")
+    print("  - results/recurrent_advantage_benchmark_20seeds_statistics.csv")
+    print("=" * 70)
 
 if __name__ == "__main__":
-    run_benchmark()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Run the Energy-Based Orchestration Benchmark suite."
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Run quick validation mode (2 seeds) instead of full mode (20 seeds)."
+    )
+    args = parser.parse_args()
+    run_benchmark(quick=args.quick)

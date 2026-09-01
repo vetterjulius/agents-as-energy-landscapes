@@ -254,6 +254,94 @@ def generate_robustness_episode(episode, seed=42):
     )
 
 
+def context_similarity(current_embeddings, current_interactions, previous_context):
+    """Return a bounded similarity score for consecutive episode contexts."""
+    if previous_context is None:
+        return 1.0
+
+    previous_embeddings, previous_interactions = previous_context
+    def cosine_or_equal(first, second):
+        first_norm = first.norm().item()
+        second_norm = second.norm().item()
+        if first_norm == 0.0 or second_norm == 0.0:
+            return 1.0 if first_norm == second_norm else 0.0
+        return torch.nn.functional.cosine_similarity(
+            first.unsqueeze(0),
+            second.unsqueeze(0),
+        ).item()
+
+    current_embedding_summary = current_embeddings.mean(dim=0)
+    previous_embedding_summary = previous_embeddings.mean(dim=0)
+    embedding_similarity = cosine_or_equal(
+        current_embedding_summary,
+        previous_embedding_summary,
+    )
+
+    current_graph = current_interactions.flatten()
+    previous_graph = previous_interactions.flatten()
+    graph_similarity = cosine_or_equal(current_graph, previous_graph)
+
+    return max(0.0, min(1.0, 0.5 * (embedding_similarity + graph_similarity)))
+
+
+def generate_regime_switch_episode(
+    episode,
+    seed=42,
+    num_agents=10,
+    num_tasks=25,
+    dim=8,
+    regime_length=10,
+):
+    """Generate recurring A/B regimes with stable within-regime structure."""
+    regime = (episode // regime_length) % 2
+
+    torch.manual_seed(seed)
+    random.seed(seed)
+    base_s = torch.randn(num_agents, dim)
+    tasks_a = torch.randn(num_tasks, dim)
+    tasks_b = tasks_a.roll(shifts=1, dims=1) + 0.5
+
+    interaction_a = torch.zeros(num_tasks, num_tasks)
+    interaction_b = torch.zeros(num_tasks, num_tasks)
+    for start in range(0, num_tasks - 1, 2):
+        interaction_a[start, start + 1] = 1.0
+        interaction_a[start + 1, start] = 1.0
+    for start in range(0, num_tasks - 2, 3):
+        interaction_b[start, start + 2] = 1.0
+        interaction_b[start + 2, start] = 1.0
+
+    tasks = tasks_a if regime == 0 else tasks_b
+    interaction_graph = interaction_a if regime == 0 else interaction_b
+    agents = [
+        Agent(
+            id=f"agent_{agent_idx}",
+            role="regime_agent",
+            capability_embedding=base_s[agent_idx].clone(),
+        )
+        for agent_idx in range(num_agents)
+    ]
+    task_list = [
+        Task(
+            id=f"task_{task_idx}",
+            embedding=tasks[task_idx].clone(),
+            estimated_cost=1.0,
+        )
+        for task_idx in range(num_tasks)
+    ]
+
+    co_assignment_costs = torch.zeros(num_tasks, num_tasks)
+    risk_weights = torch.randn(3 * dim, 1)
+
+    return ProblemInstance(
+        agents=agents,
+        tasks=task_list,
+        interaction_graph=interaction_graph.clone(),
+        co_assignment_costs=co_assignment_costs,
+        risk_weights=risk_weights,
+        constraints={"regime": regime},
+    )
+
+
 # ----------------------------------------------------------------------
 # 2. Multi-Episode Simulation Engine
 # ----------------------------------------------------------------------
@@ -264,7 +352,17 @@ class MultiEpisodeSimulator:
         self.num_episodes = num_episodes
         self.seed = seed
 
-    def run(self, config_override=None, kappa_enabled=True, theta_enabled=True):
+    def run(
+        self,
+        config_override=None,
+        kappa_enabled=True,
+        theta_enabled=True,
+        search_mode="hybrid",
+        memory_retention=1.0,
+        theta_retention=1.0,
+        adaptive_retention=False,
+        reference_energy_fn=None,
+    ):
         """
         Runs the simulation across episodes and tracks all historical metrics.
         """
@@ -295,6 +393,7 @@ class MultiEpisodeSimulator:
         carried_kappa = {}  # agent_id -> kappa_vector
         carried_Theta = None # Tensor
         carried_running_co = None
+        previous_context = None
 
         history = []
         prev_X = None
@@ -309,16 +408,23 @@ class MultiEpisodeSimulator:
 
             s = torch.stack([a.capability_embedding for a in problem.agents])
             c = torch.stack([t.embedding for t in problem.tasks])
+            context_factor = (
+                context_similarity(c, problem.interaction_graph, previous_context)
+                if adaptive_retention
+                else 1.0
+            )
+            effective_memory_retention = memory_retention * context_factor
+            effective_theta_retention = theta_retention * context_factor
 
             # Reconstruct carrying-over memory
             kappa = torch.zeros(N, d)
             for i, a in enumerate(problem.agents):
                 if a.id in carried_kappa:
-                    kappa[i] = carried_kappa[a.id]
+                    kappa[i] = effective_memory_retention * carried_kappa[a.id]
 
             # Reconstruct carrying-over structural dependencies (Theta)
             if theta_enabled and carried_Theta is not None and carried_Theta.shape == (M, M):
-                Theta = carried_Theta.clone()
+                Theta = effective_theta_retention * carried_Theta
             else:
                 Theta = problem.interaction_graph.clone()
 
@@ -363,7 +469,8 @@ class MultiEpisodeSimulator:
                     "hybrid_cleanup_prob": 0.0,
                     "local_refine_steps": 1,           # Fast local search
                     "theta_mode": base_cfg["model"]["theta_mode"],
-                    "search_mode": "hybrid"
+                    "memory_mode": "dynamic" if kappa_enabled else "static",
+                    "search_mode": search_mode,
                 }
             }
 
@@ -380,6 +487,17 @@ class MultiEpisodeSimulator:
 
             # Evaluate metrics on physical/real environment
             energy, _ = compute_energy(problem, X_final)
+            reference_energy = (
+                reference_energy_fn(problem)
+                if reference_energy_fn is not None
+                else None
+            )
+            internal_energy, _ = compute_energy(
+                problem,
+                X_final,
+                kappa=orchestrator.state.kappa,
+                theta=orchestrator.state.Theta,
+            )
             lb = load_balance(X_final)
             coord = coordination_score(problem, X_final)
             conf = constraint_violations(problem, X_final)
@@ -397,6 +515,14 @@ class MultiEpisodeSimulator:
             history.append({
                 "episode": ep,
                 "energy": energy,
+                "external_energy": energy,
+                "internal_energy": internal_energy,
+                "reference_energy": reference_energy,
+                "absolute_gap": (
+                    energy - reference_energy
+                    if reference_energy is not None
+                    else None
+                ),
                 "load_balance": lb,
                 "coordination": coord,
                 "conflicts": conf,
@@ -405,7 +531,8 @@ class MultiEpisodeSimulator:
                 "communication_cost": comm,
                 "conflict_rate": confr,
                 "reconfig_cost": reconfig,
-                "kappa_norm": float(orchestrator.state.kappa.norm().item())
+                "kappa_norm": float(orchestrator.state.kappa.norm().item()),
+                "context_similarity": context_factor,
             })
 
             # Save memories to carry over
@@ -418,6 +545,7 @@ class MultiEpisodeSimulator:
                 carried_running_co = orchestrator.theta_updater.running_co
             else:
                 carried_running_co = None
+            previous_context = (c.clone(), problem.interaction_graph.clone())
             prev_X = X_final.clone()
 
         return pd.DataFrame(history)

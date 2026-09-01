@@ -10,7 +10,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
     # 1. Generate Main Report
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("# Multi-Agent System Energy Landscape Orchestration Benchmark\n\n")
-        f.write("This report presents the rigorous, paper-ready scientific evaluation of the **Energy-Based Orchestration Model** against various baselines (deterministic, heuristic, and classical optimization methods) across multiple random seeds ($\geq 30$ Runs) to establish statistical significance. \n\n")
+        f.write("This report presents the rigorous, scientific evaluation of the **Energy-Based Orchestration Model** against various baselines (deterministic, heuristic, and classical optimization methods) across multiple random seeds ($\\geq 30$ Runs) to establish statistical significance. \n\n")
 
         f.write("## Table of Contents\n")
         f.write("1. [Core Evaluation per Scenario](#core-evaluation-per-scenario)\n")
@@ -24,7 +24,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
             f.write(f"### Scenario: {scenario_name}\n\n")
 
             # Table 1: Main Performance Metrics
-            f.write("#### Performance Summary (Mean $\pm$ Standard Deviation)\n\n")
+            f.write("#### Performance Summary (Mean $\\pm$ Standard Deviation)\n\n")
             f.write("| Orchestrator | Total Energy | Load Balance (std) | Coordination Score | Conflicts (Violations) | Runtime (s) |\n")
             f.write("| :--- | :---: | :---: | :---: | :---: | :---: |\n")
 
@@ -35,7 +35,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
                 conf_mean, conf_std = np.mean(metrics["conflicts"]), np.std(metrics["conflicts"])
                 rt_mean, rt_std = np.mean(metrics["runtime"]), np.std(metrics["runtime"])
 
-                f.write(f"| {orch_name} | {e_mean:.4f} $\pm$ {e_std:.4f} | {lb_mean:.4f} $\pm$ {lb_std:.4f} | {co_mean:.2f} $\pm$ {co_std:.2f} | {conf_mean:.2f} $\pm$ {conf_std:.2f} | {rt_mean:.4f} $\pm$ {rt_std:.4f} |\n")
+                f.write(f"| {orch_name} | {e_mean:.4f} $\\pm$ {e_std:.4f} | {lb_mean:.4f} $\\pm$ {lb_std:.4f} | {co_mean:.2f} $\\pm$ {co_std:.2f} | {conf_mean:.2f} $\\pm$ {conf_std:.2f} | {rt_mean:.4f} $\\pm$ {rt_std:.4f} |\n")
             f.write("\n")
 
             # Table 2: Emergent Behavior Metrics
@@ -49,7 +49,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
                 comm_mean, comm_std = np.mean(metrics["communication_cost"]), np.std(metrics["communication_cost"])
                 confr_mean, confr_std = np.mean(metrics["conflict_rate"]), np.std(metrics["conflict_rate"])
 
-                f.write(f"| {orch_name} | {spec_mean:.4f} $\pm$ {spec_std:.4f} | {clust_mean:.4f} $\pm$ {clust_std:.4f} | {comm_mean:.2f} $\pm$ {comm_std:.2f} | {confr_mean:.2f} $\pm$ {confr_std:.2f} |\n")
+                f.write(f"| {orch_name} | {spec_mean:.4f} $\\pm$ {spec_std:.4f} | {clust_mean:.4f} $\\pm$ {clust_std:.4f} | {comm_mean:.2f} $\\pm$ {comm_std:.2f} | {confr_mean:.2f} $\\pm$ {confr_std:.2f} |\n")
             f.write("\n")
 
             # Table 3: Statistical Significance Analysis
@@ -136,7 +136,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
         f.write("![Coupling Energy](plots/coupling_energy.png)\n")
         f.write("![Coupling Coordination](plots/coupling_coordination.png)\n\n")
         f.write("**Interpretation**:\n")
-        f.write("- **Energy Sweep**: Analyzes sensitivity of final energy to the interaction coupling weight $\lambda_{int}$.\n")
+        f.write("- **Energy Sweep**: Analyzes sensitivity of final energy to the interaction coupling weight $\\lambda_{int}$.\n")
         f.write("- **Coordination Sweep**: Realized synergies (coordination scores) as coupling weight scales. Heuristics are flat because they ignore task interactions, whereas energy models dynamically pool tasks on the same agent as synergies become more valuable.\n\n")
 
         f.write("## 4. Conflict and Constraint Violations\n\n")
@@ -161,7 +161,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
         f.write("### Task-Dependency Graph\n")
         f.write("![Task Dependency Graph](plots/task_dependency_graph.png)\n\n")
         f.write("**Interpretation**:\n")
-        f.write("- **What this shows**: Synergy/dependency network graph where edges denote positive interactions ($\Theta_{i,j}$) between tasks.\n")
+        f.write("- **What this shows**: Synergy/dependency network graph where edges denote positive interactions ($\\Theta_{i,j}$) between tasks.\n")
         f.write("- **Analysis**: Visualizes problem complexity. Cliques or dense clusters indicate task groups that must be co-assigned to reduce interaction energy.\n\n")
 
         f.write("### Agent-Task Bipartite Graph\n")

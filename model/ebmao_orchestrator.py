@@ -41,6 +41,10 @@ class EBMAOOrchestrator:
 
         # modes
         self.theta_mode = m.get("theta_mode", "static")  # "static", "dynamic", "hybrid"
+        self.memory_mode = m.get(
+            "memory_mode",
+            "dynamic" if self.theta_mode != "static" else "static",
+        )
         self.search_mode = m.get("search_mode", "hybrid")  # "hybrid", "pure_sa", "pure_greedy"
 
         # guided proposal config
@@ -112,22 +116,37 @@ class EBMAOOrchestrator:
         self.energy_registry.add(EBMAOCostEnergy(weight=self.w_cost))
         self.energy_registry.add(EBMAORiskEnergy(self.risk_predictor, weight=self.w_risk))
 
-        # Dynamics components
+        proposal_mode = (
+            "random"
+            if self.search_mode == "pure_sa"
+            else "guided"
+        )
+
         self.proposal_mechanism = EBMAOAssignmentProposal(
             self.energy_registry,
             lambda_align=self.lambda_align,
             lambda_memory=self.lambda_memory,
             num_tasks=self.proposal_task_sample,
             block_size=self.block_move_size,
-            agent_sample_size=self.agent_sample_size
+            agent_sample_size=self.agent_sample_size,
+            mode=proposal_mode,
         )
+
+        sampler_mode = (
+            "hybrid"
+            if self.search_mode == "hybrid"
+            else "sa"
+        )
+
         self.sampler = SimulatedAnnealingSampler(
             self.proposal_mechanism,
             self.energy_registry,
             T_init=self.T_init,
             target_accept=self.target_accept,
-            num_candidates=self.proposal_candidates
+            num_candidates=self.proposal_candidates,
+            mode=sampler_mode,
         )
+        
         self.theta_updater = ThetaUpdater(self.eta_theta)
         self.memory_updater = EBMAOMemoryUpdater(self.eta_memory)
         self.temperature_controller = TemperatureController(
@@ -169,11 +188,15 @@ class EBMAOOrchestrator:
                     if improved:
                         self.state.X = best_X
 
-        if self.theta_mode != "static":
-            self.theta_updater.apply(self.state)
-        self.memory_updater.apply(self.state, self.risk_predictor)
+        self._update_adaptive_state()
         if self.search_mode != "pure_greedy":
             self.temperature_controller.apply(self.sampler)
+
+    def _update_adaptive_state(self):
+        if self.theta_mode != "static":
+            self.theta_updater.apply(self.state)
+        if self.memory_mode != "static" and self.eta_memory > 0.0:
+            self.memory_updater.apply(self.state, self.risk_predictor)
 
     def total_energy(self):
         total, _ = self.energy_registry.compute(self.state)
@@ -270,8 +293,7 @@ class EBMAOOrchestrator:
             if not improved:
                 break
             self.state.X = best_X
-            self.theta_updater.apply(self.state)
-            self.memory_updater.apply(self.state, self.risk_predictor)
+            self._update_adaptive_state()
 
     def _local_refine(self, max_iters=2):
         for _ in range(max_iters):
@@ -301,8 +323,7 @@ class EBMAOOrchestrator:
 
         self.state.X = X_init
         if not torch.equal(self.state.X, original_X):
-            self.theta_updater.apply(self.state)
-            self.memory_updater.apply(self.state, self.risk_predictor)
+            self._update_adaptive_state()
 
     def log(self, step):
         E, _ = self.energy_registry.compute(self.state)

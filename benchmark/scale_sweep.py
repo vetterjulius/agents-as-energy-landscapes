@@ -58,7 +58,9 @@ def run_scale_sweep():
                     "Runtime": float(elapsed)
                 })
             except Exception as e:
-                print(f"    [ERROR] {name} failed on Tasks={M}: {e}")
+                raise RuntimeError(
+                    f"Task scaling failed for {name} at Tasks={M}"
+                ) from e
 
     # 2. Scale Agents (Fix Task count = 50)
     fixed_tasks = 50
@@ -81,7 +83,9 @@ def run_scale_sweep():
                     "Runtime": float(elapsed)
                 })
             except Exception as e:
-                print(f"    [ERROR] {name} failed on Agents={N}: {e}")
+                raise RuntimeError(
+                    f"Agent scaling failed for {name} at Agents={N}"
+                ) from e
 
     # Save to CSV
     df_tasks = pd.DataFrame(results_tasks)
