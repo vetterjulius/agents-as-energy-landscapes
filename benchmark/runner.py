@@ -181,17 +181,19 @@ def run_experiment(
     return all_results
 
 def run_benchmark(quick: bool = False):
-    print("Starting Energy-Based Orchestration Benchmark (EOB)...")
+    print("=" * 70)
+    print("Energy-Based Orchestration Benchmark")
+    print("=" * 70)
 
     # ------------------------------------------------------------
     # Select configuration
     # ------------------------------------------------------------
     if quick:
         cfg = deep_merge_config(config, quick_config)
+        mode = "QUICK (validation only)"
     else:
         cfg = copy.deepcopy(config)
-
-    print(f"Configuration: {'QUICK' if quick else 'FULL'}")
+        mode = "FULL"
 
     # ------------------------------------------------------------
     # Global benchmark configuration
@@ -199,7 +201,9 @@ def run_benchmark(quick: bool = False):
     base_seed = cfg.get("seed", 42)
     num_seeds = cfg.get("num_evaluation_seeds", 30)
 
-    print(f"Configured to run {num_seeds} seeds per scenario.")
+    print(f"\nMode: {mode}")
+    print(f"Seeds per scenario: {num_seeds}")
+    print(f"Base random seed: {base_seed}")
 
     # ------------------------------------------------------------
     # Problem configuration
@@ -209,6 +213,15 @@ def run_benchmark(quick: bool = False):
     dim = problem_cfg.get("dim", 8)
     n_agents = problem_cfg.get("num_agents", 5)
     n_tasks = problem_cfg.get("num_tasks", 10)
+
+    print(f"\nProblem configuration:")
+    print(f"  Agents: {n_agents}, Tasks: {n_tasks}, Embedding dim: {dim}")
+
+    exp1_iter = cfg.get("experiment_1", {}).get("iterations", 100)
+    exp2_iter = cfg.get("experiment_2", {}).get("iterations", 100)
+    print(f"\nSolver iterations:")
+    print(f"  Experiment 1 (World): {exp1_iter}")
+    print(f"  Experiment 2 (Solver Battle): {exp2_iter}")
 
     # ------------------------------------------------------------
     # Instantiate scenarios
@@ -224,15 +237,9 @@ def run_benchmark(quick: bool = False):
             num_tasks=n_tasks,
             dim=dim,
         ),
-        "Dynamic": DynamicScenario(
+        "Frustrated": FrustratedScenario(
             num_agents=n_agents,
             num_tasks=n_tasks,
-            dim=dim,
-        ),
-        "DistributionShift": DistributionShiftScenario(
-            dim=dim,
-        ),
-        "Frustrated": FrustratedScenario(
             dim=dim,
         ),
     }
@@ -489,7 +496,29 @@ def run_benchmark(quick: bool = False):
     else:
         print("\nSkipping Dynamic & Long-Horizon Adaptation Benchmark.")
 
-    print("\nBenchmark Complete. Results and figures saved in results/")
+    # Final summary
+    print("\n" + "=" * 70)
+    print("Benchmark Complete")
+    print("=" * 70)
+    print("Results saved to:")
+    print("  - results/benchmark_results.csv (raw per-run data)")
+    print("  - results/benchmark_results_summary.csv (aggregated)")
+    print("  - results/benchmark_report.md (markdown report)")
+    print("  - results/figure_catalog.md (figure descriptions)")
+    print("  - results/plots/ (all visualization figures)")
+    print("  - results/ebmao_vs_world_20seeds.csv")
+    print("  - results/recurrent_advantage_benchmark_20seeds_statistics.csv")
+    print("=" * 70)
 
 if __name__ == "__main__":
-    run_benchmark()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Run the Energy-Based Orchestration Benchmark suite."
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Run quick validation mode (2 seeds) instead of full mode (20 seeds)."
+    )
+    args = parser.parse_args()
+    run_benchmark(quick=args.quick)

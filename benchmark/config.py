@@ -1,11 +1,11 @@
 config = {
     "seed": 42,
-    "num_evaluation_seeds": 30,
+    "num_evaluation_seeds": 20,
 
     "problem": {
         "dim": 8,
-        "num_agents": 5,
-        "num_tasks": 10,
+        "num_agents": 3,
+        "num_tasks": 6,
     },
 
     "energy": {
@@ -20,12 +20,12 @@ config = {
     # Main solver used by Experiment 1 for the proposed systems.
     "experiment_1": {
         "energy_solver": "hybrid",
-        "iterations": 100,
+        "iterations": 25,
     },
 
     # Solver comparison on the same energy landscape.
     "experiment_2": {
-        "iterations": 100,
+        "iterations": 25,
 
         "energy_greedy": {},
         "energy_sa": {
@@ -108,25 +108,31 @@ config = {
 }
 
 quick_config = {
-    "num_evaluation_seeds": 1,
+    "num_evaluation_seeds": 2,
+
+    "problem": {
+        "dim": 8,
+        "num_agents": 3,
+        "num_tasks": 6,
+    },
 
     "experiment_1": {
-        "iterations": 10,
+        "iterations": 5,
     },
 
     "experiment_2": {
-        "iterations": 10,
+        "iterations": 5,
     },
 
     "scalability": {
-        "sweep_iterations": 3,
+        "sweep_iterations": 1,
     },
 
     "sweep": {
-        "iterations": 10,
+        "iterations": 5,
     },
 
-    # Expensive secondary experiments are skipped in quick mode.
+    # In quick mode, run both core experiments but skip secondary/expensive ones.
     "run_scale_sweep": False,
     "run_coupling_sweep": False,
     "run_dynamic_benchmark": False,

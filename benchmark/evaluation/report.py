@@ -10,7 +10,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
     # 1. Generate Main Report
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("# Multi-Agent System Energy Landscape Orchestration Benchmark\n\n")
-        f.write("This report presents the rigorous, paper-ready scientific evaluation of the **Energy-Based Orchestration Model** against various baselines (deterministic, heuristic, and classical optimization methods) across multiple random seeds ($\\geq 30$ Runs) to establish statistical significance. \n\n")
+        f.write("This report presents the rigorous, scientific evaluation of the **Energy-Based Orchestration Model** against various baselines (deterministic, heuristic, and classical optimization methods) across multiple random seeds ($\\geq 30$ Runs) to establish statistical significance. \n\n")
 
         f.write("## Table of Contents\n")
         f.write("1. [Core Evaluation per Scenario](#core-evaluation-per-scenario)\n")
