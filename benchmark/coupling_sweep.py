@@ -95,13 +95,17 @@ def run_coupling_sweep():
 
             elapsed = time.perf_counter() - start_time
 
+            energy_cfg = {
+                "interaction_weight": iw,
+                "lambda_align": current_cfg["model"].get("lambda_align", 0.5),
+                "cost_weight": current_cfg["model"].get("cost_weight", 1.0),
+                "risk_weight": current_cfg["model"].get("risk_weight", 1.0),
+            }
+
             energy, _ = compute_energy(
                 problem,
                 X,
-                interaction_weight=iw,
-                lambda_align=current_cfg["model"].get("lambda_align", 0.5),
-                cost_weight=current_cfg["model"].get("cost_weight", 1.0),
-                risk_weight=current_cfg["model"].get("risk_weight", 1.0),
+                energy_cfg=energy_cfg,
             )
 
             lb = load_balance(X)

@@ -242,6 +242,16 @@ def run_benchmark(quick: bool = False):
             num_tasks=n_tasks,
             dim=dim,
         ),
+        "Dynamic": DynamicScenario(
+            num_agents=n_agents,
+            num_tasks=n_tasks,
+            dim=dim,
+        ),
+        "DistributionShift": DistributionShiftScenario(
+            num_agents=n_agents,
+            num_tasks=n_tasks,
+            dim=dim,
+        )
     }
 
     # ------------------------------------------------------------
