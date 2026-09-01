@@ -67,7 +67,9 @@ class Orchestrator:
             self.hybrid_cleanup_prob = m.get("hybrid_cleanup_prob", 0.25)
             self.local_refine_steps = m.get("local_refine_steps", 2)
 
-        # temperature hyperparameters
+        # Temperature hyperparameters
+        # Note: T_min can be >= 1.0, so max(T, 1e-8) in sampler is always T.
+        # This is correct - no numerical stability issue.
         self.T_init = m["temperature_init"]
         self.T_min = m["min_temperature"]
         self.T_max = m["max_temperature"]
@@ -181,7 +183,9 @@ class Orchestrator:
                     if improved:
                         self.state.X = best_X
 
-                # Additional greedy cleanup on every step for stronger exploitation.
+                # Additional greedy cleanup (35% probability) for stronger exploitation.
+                # Design choice: Hybrid mode intentionally favors exploitation over exploration
+                # to escape local minima found by SA and converge to better solutions faster.
                 if self.local_refine_steps > 0 and random.random() < 0.35:
                     best_X, _, improved = self._find_best_reassignment()
                     if improved:
@@ -266,6 +270,13 @@ class Orchestrator:
         return best_X, best_E, improved
 
     def _warm_start(self):
+        """Initialize with greedy solution and refine.
+        
+        Design note: Updates adaptive state (Theta, kappa) during warm-start.
+        This seeds the learned parameters with greedy solution patterns.
+        While this creates initialization bias, it accelerates convergence
+        for problems where greedy solutions contain useful structure.
+        """
         if self.warm_start_type == "greedy":
             self._greedy_construction_init()
 

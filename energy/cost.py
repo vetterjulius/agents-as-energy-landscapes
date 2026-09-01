@@ -4,4 +4,6 @@ from energy.base import EnergyTerm
 class CostEnergy(EnergyTerm):
     def compute(self, state):
         co = state.X.T @ state.X
-        return (state.C * co).sum() / (state.N * state.M)
+        # Normalize by M² since co-occurrence matrix is [M, M]
+        # This ensures scale-invariant energy across problem sizes
+        return (state.C * co).sum() / (state.M * state.M)

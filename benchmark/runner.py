@@ -143,6 +143,7 @@ def run_experiment(
 
             for o_name, orchestrator in orchestrators.items():
                 start_time = time.perf_counter()
+                # Full reproducibility: seed all RNG sources
                 torch.manual_seed(seed)
                 random.seed(seed)
                 np.random.seed(seed)

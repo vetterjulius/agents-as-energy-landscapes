@@ -114,13 +114,15 @@ class AssignmentProposal:
 
         # --------------------------------------------------------------
         # Avoid no-op proposals whenever possible.
+        # For N=1 (single agent), all proposals result in identical X.
+        # For N>1, retry with random swap if proposal didn't change anything.
         # --------------------------------------------------------------
 
-        if (
-            state.N > 1
-            and torch.equal(X_prop, state.X)
-        ):
+        if torch.equal(X_prop, state.X) and state.N > 1:
+            # Fallback: force a change with random swap
             X_prop = self._random_swap(state)
+            # Note: Even after retry, X_prop might still equal state.X in edge cases.
+            # This is acceptable - the sampler will simply reject with 100% probability.
 
         self._validate_assignment(
             state,

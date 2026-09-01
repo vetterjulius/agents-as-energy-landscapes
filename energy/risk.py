@@ -18,7 +18,8 @@ class RiskPredictor:
         x = torch.cat([s_exp, c_exp, k_exp], dim=-1)
 
         h = torch.matmul(x, self.W_risk).squeeze(-1)
-        h = h / math.sqrt(self.d)
+        # Numerical safety: prevent division by zero for edge case d=0
+        h = h / math.sqrt(max(self.d, 1e-8))
 
         return torch.sigmoid(h)
 

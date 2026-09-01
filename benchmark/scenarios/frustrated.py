@@ -20,10 +20,11 @@ class FrustratedScenario(Scenario):
         random.seed(seed)
 
         # Create agents with distinct specializations
+        # Add noise to prevent artificial one-hot structure
         agents = []
         for i in range(self.N):
-            capability = torch.zeros(self.d)
-            capability[i % self.d] = 1.0
+            capability = torch.randn(self.d) * 0.3  # Small noise
+            capability[i % self.d] += 2.0  # Strong but not perfect specialization
             agents.append(Agent(
                 id=f"agent_{i}",
                 role="specialist",
@@ -35,8 +36,8 @@ class FrustratedScenario(Scenario):
         for j in range(self.M):
             # Task j fits agent j % N
             target_agent = j % self.N
-            embedding = torch.zeros(self.d)
-            embedding[target_agent % self.d] = 1.0
+            embedding = torch.randn(self.d) * 0.3  # Small noise
+            embedding[target_agent % self.d] += 2.0  # Strong alignment
             tasks.append(Task(
                 id=f"task_{j}",
                 embedding=embedding
