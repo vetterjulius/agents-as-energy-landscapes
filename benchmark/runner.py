@@ -4,6 +4,7 @@ import time
 import copy
 import numpy as np
 from benchmark.config import config, quick_config
+from benchmark.logging_config import get_logger
 from benchmark.scenarios.independent import IndependentScenario
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.scenarios.dynamic import DynamicScenario
@@ -37,6 +38,8 @@ from benchmark.ablations import run_representation_ablations, run_solver_ablatio
 from benchmark.scale_sweep import run_scale_sweep
 from benchmark.coupling_sweep import run_coupling_sweep
 from benchmark.dynamic_benchmark import run_dynamic_benchmark
+
+logger = get_logger("runner")
 
 def deep_merge_config(base, overrides):
     """
@@ -108,14 +111,15 @@ def run_experiment(
     num_seeds,
     config,
 ):
-    print(f"\n{'=' * 70}")
-    print(f"Starting experiment: {experiment_name}")
-    print(f"{'=' * 70}")
+    logger.info("=" * 70)
+    logger.info(f"Experiment: {experiment_name}")
+    logger.info("=" * 70)
 
     all_results = {}
 
     for s_name, scenario in scenarios.items():
-        print(f"\n  Running Scenario: {s_name} ({num_seeds} seeds)")
+        logger.info(f"Scenario: {s_name} | Seeds: {num_seeds}")
+        logger.debug(f"  Initializing result storage for {len(orchestrators)} orchestrators")
         all_results[s_name] = {}
 
         for o_name in orchestrators.keys():
@@ -133,6 +137,7 @@ def run_experiment(
 
         for run_idx in range(num_seeds):
             seed = base_seed + run_idx
+            logger.debug(f"  Seed {run_idx + 1}/{num_seeds} (seed={seed})")
 
             base_problem = scenario.generate(seed)
             problem = apply_robustness_perturbations(
@@ -142,6 +147,7 @@ def run_experiment(
             )
 
             for o_name, orchestrator in orchestrators.items():
+                logger.debug(f"    Running {o_name}...")
                 start_time = time.perf_counter()
                 # Full reproducibility: seed all RNG sources
                 torch.manual_seed(seed)
@@ -172,6 +178,8 @@ def run_experiment(
                     metrics["task_clustering"].append(clust)
                     metrics["communication_cost"].append(comm)
                     metrics["conflict_rate"].append(confr)
+                    
+                    logger.debug(f"      → Energy={energy:.4f}, Coord={coord:.2f}, Conflicts={conf}, Time={elapsed:.4f}s")
 
                 except Exception as e:
                     raise RuntimeError(
@@ -182,9 +190,9 @@ def run_experiment(
     return all_results
 
 def run_benchmark(quick: bool = False):
-    print("=" * 70)
-    print("Energy-Based Orchestration Benchmark")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("Energy-Based Orchestration Benchmark")
+    logger.info("=" * 70)
 
     # ------------------------------------------------------------
     # Select configuration
@@ -202,9 +210,9 @@ def run_benchmark(quick: bool = False):
     base_seed = cfg.get("seed", 42)
     num_seeds = cfg.get("num_evaluation_seeds", 30)
 
-    print(f"\nMode: {mode}")
-    print(f"Seeds per scenario: {num_seeds}")
-    print(f"Base random seed: {base_seed}")
+    logger.info(f"Mode: {mode}")
+    logger.info(f"Seeds per scenario: {num_seeds}")
+    logger.info(f"Base random seed: {base_seed}")
 
     # ------------------------------------------------------------
     # Problem configuration
@@ -215,14 +223,11 @@ def run_benchmark(quick: bool = False):
     n_agents = problem_cfg.get("num_agents", 5)
     n_tasks = problem_cfg.get("num_tasks", 10)
 
-    print(f"\nProblem configuration:")
-    print(f"  Agents: {n_agents}, Tasks: {n_tasks}, Embedding dim: {dim}")
+    logger.info(f"Problem configuration: Agents={n_agents}, Tasks={n_tasks}, Dim={dim}")
 
     exp1_iter = cfg.get("experiment_1", {}).get("iterations", 100)
     exp2_iter = cfg.get("experiment_2", {}).get("iterations", 100)
-    print(f"\nSolver iterations:")
-    print(f"  Experiment 1 (World): {exp1_iter}")
-    print(f"  Experiment 2 (Solver Battle): {exp2_iter}")
+    logger.info(f"Solver iterations: Exp1={exp1_iter}, Exp2={exp2_iter}")
 
     # ------------------------------------------------------------
     # Instantiate scenarios
@@ -428,7 +433,8 @@ def run_benchmark(quick: bool = False):
     # ------------------------------------------------------------
     # Ablations
     # ------------------------------------------------------------
-    print("\n  Running Ablations on Interaction Scenario...")
+    logger.info("Running ablations on Interaction scenario")
+    logger.debug("  Testing energy component contributions and solver variants")
 
     interaction_problem = scenarios["Interaction"].generate(
         base_seed,
@@ -448,11 +454,13 @@ def run_benchmark(quick: bool = False):
         },
     )
 
+    logger.debug("  Running representation ablations...")
     rep_ablation_results = run_representation_ablations(
         interaction_problem,
         ablation_cfg,
     )
 
+    logger.debug("  Running solver ablations...")
     sol_ablation_results = run_solver_ablations(
         interaction_problem,
         ablation_cfg,
@@ -461,13 +469,15 @@ def run_benchmark(quick: bool = False):
     # ------------------------------------------------------------
     # Reporting
     # ------------------------------------------------------------
-    print("\nGenerating report for Experiment 1...")
+    logger.info("Generating reports for Experiment 1")
+    logger.debug(f"  Processing {len(world_results)} scenario results")
 
     generate_markdown_report(world_results)
     save_csv_results(world_results)
     plot_results(world_results)
 
-    print("\nGenerating report for Experiment 2...")
+    logger.info("Generating reports for Experiment 2")
+    logger.debug(f"  Processing {len(solver_results)} scenario results")
 
     generate_markdown_report(solver_results)
     save_csv_results(solver_results)
@@ -476,50 +486,50 @@ def run_benchmark(quick: bool = False):
     # ------------------------------------------------------------
     # Ablation summary
     # ------------------------------------------------------------
-    print("\nRepresentation Ablation Results (Interaction Scenario):")
+    logger.info("Representation Ablation Results (Interaction Scenario):")
 
     for name, energy in rep_ablation_results.items():
-        print(f"  {name}: {energy:.4f}")
+        logger.info(f"  {name}: {energy:.4f}")
 
-    print("\nSolver Ablation Results (Interaction Scenario):")
+    logger.info("Solver Ablation Results (Interaction Scenario):")
 
     for name, energy in sol_ablation_results.items():
-        print(f"  {name}: {energy:.4f}")
+        logger.info(f"  {name}: {energy:.4f}")
 
     # ------------------------------------------------------------
     # Additional experiments
     # ------------------------------------------------------------
     if cfg.get("run_scale_sweep", True):
-        print("\nRunning Scale Sweep Experiment...")
+        logger.info("Running Scale Sweep Experiment")
         run_scale_sweep()
     else:
-        print("\nSkipping Scale Sweep Experiment.")
+        logger.info("Skipping Scale Sweep Experiment")
 
     if cfg.get("run_coupling_sweep", True):
-        print("\nRunning Coupling Sweep Experiment...")
+        logger.info("Running Coupling Sweep Experiment")
         run_coupling_sweep()
     else:
-        print("\nSkipping Coupling Sweep Experiment.")
+        logger.info("Skipping Coupling Sweep Experiment")
 
     if cfg.get("run_dynamic_benchmark", True):
-        print("\nRunning Dynamic & Long-Horizon Adaptation Benchmark...")
+        logger.info("Running Dynamic & Long-Horizon Adaptation Benchmark")
         run_dynamic_benchmark()
     else:
-        print("\nSkipping Dynamic & Long-Horizon Adaptation Benchmark.")
+        logger.info("Skipping Dynamic & Long-Horizon Adaptation Benchmark")
 
     # Final summary
-    print("\n" + "=" * 70)
-    print("Benchmark Complete")
-    print("=" * 70)
-    print("Results saved to:")
-    print("  - results/benchmark_results.csv (raw per-run data)")
-    print("  - results/benchmark_results_summary.csv (aggregated)")
-    print("  - results/benchmark_report.md (markdown report)")
-    print("  - results/figure_catalog.md (figure descriptions)")
-    print("  - results/plots/ (all visualization figures)")
-    print("  - results/ebmao_vs_world_20seeds.csv")
-    print("  - results/recurrent_advantage_benchmark_20seeds_statistics.csv")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("Benchmark Complete")
+    logger.info("=" * 70)
+    logger.info("Results saved to:")
+    logger.info("  - results/benchmark_results.csv (raw per-run data)")
+    logger.info("  - results/benchmark_results_summary.csv (aggregated)")
+    logger.info("  - results/benchmark_report.md (markdown report)")
+    logger.info("  - results/figure_catalog.md (figure descriptions)")
+    logger.info("  - results/plots/ (all visualization figures)")
+    logger.info("  - results/ebmao_vs_world_20seeds.csv")
+    logger.info("  - results/recurrent_advantage_benchmark_20seeds_statistics.csv")
+    logger.info("=" * 70)
 
 if __name__ == "__main__":
     import argparse

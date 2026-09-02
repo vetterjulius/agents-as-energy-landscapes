@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from benchmark.logging_config import get_logger
 from state.orchestration_state import OrchestrationState
 from model.ebmao_orchestrator import EBMAOOrchestrator
 from benchmark.scenarios.base import ProblemInstance, Task, Agent
@@ -14,6 +15,8 @@ from benchmark.evaluation.metrics import (
     compute_energy, load_balance, coordination_score, constraint_violations,
     specialization_degree, task_clustering, communication_cost, conflict_rate
 )
+
+logger = get_logger("dynamic_benchmark")
 
 # ----------------------------------------------------------------------
 # 1. Episode Generators for Dynamic Scenarios
@@ -615,9 +618,9 @@ def compute_adaptation_metrics(df, perturb_episode=25, total_episodes=50, scenar
 # ----------------------------------------------------------------------
 
 def run_dynamic_benchmark():
-    print("==========================================================")
-    print("   Starting Dynamic Adaptation & Long-Horizon Benchmark")
-    print("==========================================================")
+    logger.info("=" * 70)
+    logger.info("Dynamic Adaptation & Long-Horizon Benchmark")
+    logger.info("=" * 70)
 
     seed = 42
     os.makedirs("results", exist_ok=True)
@@ -646,7 +649,7 @@ def run_dynamic_benchmark():
     all_trajectories = {}
 
     for s_name, gen_func in scenarios.items():
-        print(f"\nEvaluating Scenario: {s_name}...")
+        logger.info(f"Evaluating scenario: {s_name}")
         all_trajectories[s_name] = {}
 
         # Decide horizon: 80 for Specialization, 50 for others
@@ -654,7 +657,7 @@ def run_dynamic_benchmark():
         simulator = MultiEpisodeSimulator(gen_func, num_episodes=num_episodes, seed=seed)
 
         for cfg_name, flags in configs.items():
-            print(f"  Running configuration: {cfg_name}...")
+            logger.debug(f"Running configuration: {cfg_name}")
             df = simulator.run(kappa_enabled=flags["kappa"], theta_enabled=flags["theta"])
 
             # Save raw dataframe
@@ -671,14 +674,14 @@ def run_dynamic_benchmark():
     # Save processed adaptation metrics to CSV
     df_metrics = pd.DataFrame(adaptation_data)
     df_metrics.to_csv("results/dynamic_adaptation_metrics.csv", index=False)
-    print("\nSaved dynamic adaptation metrics to results/dynamic_adaptation_metrics.csv")
+    logger.info("Saved dynamic adaptation metrics to results/dynamic_adaptation_metrics.csv")
 
     # Generate Plots
-    print("\nGenerating dynamic benchmark visualization plots...")
+    logger.info("Generating dynamic benchmark visualization plots")
     plot_dynamic_results(all_trajectories, df_metrics)
 
     # Generate updated report sections
-    print("\nCompiling dynamic adaptation scientific report section...")
+    logger.info("Compiling dynamic adaptation scientific report section")
     update_benchmark_reports(df_metrics)
 
 
@@ -779,7 +782,7 @@ def plot_dynamic_results(all_trajectories, df_metrics, output_dir="results/plots
     plt.savefig(f"{output_dir}/dynamic_adaptation_bars.png", dpi=150)
     plt.close()
 
-    print(f"Generated dynamic adaptation plots in {output_dir}/")
+    logger.info(f"Generated dynamic adaptation plots in {output_dir}/")
 
 
 # ----------------------------------------------------------------------

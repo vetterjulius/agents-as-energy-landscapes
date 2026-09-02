@@ -8,6 +8,9 @@ import seaborn as sns
 from benchmark.config import config
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.baselines.energy_based import EnergyHybridOrchestrator
+from benchmark.logging_config import get_logger
+
+logger = get_logger("plots")
 
 def plot_results(all_results, output_dir="results/plots"):
     os.makedirs(output_dir, exist_ok=True)
@@ -119,7 +122,7 @@ def plot_results(all_results, output_dir="results/plots"):
     # -------------------------------------------------------------
     # 4. Trajectory, Heatmaps and Graphs from a Representative Run
     # -------------------------------------------------------------
-    print("  Generating structural curves, networks, and assignment heatmaps from representative run...")
+    logger.debug("Generating structural curves, networks, and assignment heatmaps from representative run")
     seed = config.get("seed", 42)
     rep_scenario = InteractionScenario(num_agents=5, num_tasks=15, dim=8)
     problem = rep_scenario.generate(seed)

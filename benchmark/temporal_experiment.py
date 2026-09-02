@@ -4,11 +4,14 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from benchmark.logging_config import get_logger
 from benchmark.dynamic_benchmark import (
     MultiEpisodeSimulator,
     generate_regime_switch_episode,
 )
 from benchmark.evaluation.metrics import brute_force_optimum
+
+logger = get_logger("temporal_experiment")
 
 
 CONFIGURATIONS = {
@@ -197,6 +200,7 @@ if __name__ == "__main__":
         mean_gap=("absolute_gap", "mean"),
         mean_reconfiguration=("reconfig_cost", "mean"),
     )
-    print(summary.round(4).to_string(index=False))
-    print("\nPaired seed statistics:")
-    print(compute_temporal_statistics(result).round(4).to_string(index=False))
+    logger.info("Temporal Controlled Benchmark Summary:")
+    logger.info("\n" + summary.round(4).to_string(index=False))
+    logger.info("\nPaired seed statistics:")
+    logger.info("\n" + compute_temporal_statistics(result).round(4).to_string(index=False))

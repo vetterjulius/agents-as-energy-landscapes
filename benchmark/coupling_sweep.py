@@ -8,6 +8,7 @@ import torch
 import random
 
 from benchmark.config import config
+from benchmark.logging_config import get_logger
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.baselines.greedy import GreedyOrchestrator
 from benchmark.baselines.energy_based import (
@@ -27,9 +28,13 @@ from benchmark.evaluation.metrics import (
     constraint_violations,
 )
 
+logger = get_logger("coupling_sweep")
+
+logger = get_logger("coupling_sweep")
+
 
 def run_coupling_sweep():
-    print("Starting Coupling Sweep (Interaction Strength Sweep)...")
+    logger.info("Starting Coupling Sweep Experiment")
 
     seed = config.get("seed", 42)
     torch.manual_seed(seed)
@@ -46,7 +51,7 @@ def run_coupling_sweep():
     results = []
 
     for iw in coupling_weights:
-        print(f"  Coupling Sweep: interaction_weight={iw}")
+        logger.debug(f"Coupling sweep: interaction_weight={iw}")
 
         current_cfg = copy.deepcopy(config)
 
@@ -85,7 +90,7 @@ def run_coupling_sweep():
         }
 
         for name, orchestrator in orchestrators.items():
-            print(f"    Evaluating {name}...")
+            logger.debug(f"Evaluating {name}")
 
             start_time = time.perf_counter()
 
@@ -131,7 +136,7 @@ def run_coupling_sweep():
         index=False,
     )
 
-    print("Saved coupling sweep results to results/coupling_results.csv")
+    logger.info("Saved coupling sweep results to results/coupling_results.csv")
 
     plot_coupling_results(df)
 
@@ -242,9 +247,7 @@ def plot_coupling_results(df):
     )
     plt.close()
 
-    print(
-        f"Generated coupling sweep plots in {output_dir}/"
-    )
+    logger.info(f"Generated coupling sweep plots in {output_dir}/")
 
 
 if __name__ == "__main__":

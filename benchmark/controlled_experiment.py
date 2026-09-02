@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from benchmark.logging_config import get_logger
 from benchmark.baselines.energy_based import (
     EnergyGuidedSAOrchestrator,
     EnergyHybridOrchestrator,
@@ -18,6 +19,8 @@ from benchmark.evaluation.metrics import brute_force_optimum, compute_energy
 from benchmark.scenarios.frustrated import FrustratedScenario
 from benchmark.scenarios.independent import IndependentScenario
 from benchmark.scenarios.interaction import InteractionScenario
+
+logger = get_logger("controlled_experiment")
 
 
 SCENARIOS = {
@@ -120,4 +123,5 @@ if __name__ == "__main__":
         mean_gap=("absolute_gap", "mean"),
         success_rate=("absolute_gap", lambda values: float(np.mean(np.isclose(values, 0.0, atol=1e-6)))),
     )
-    print(summary.round(4).to_string(index=False))
+    logger.info("Controlled Benchmark Summary:")
+    logger.info("\n" + summary.round(4).to_string(index=False))

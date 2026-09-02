@@ -2,12 +2,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from benchmark.logging_config import get_logger
 from benchmark.dynamic_benchmark import (
     MultiEpisodeSimulator,
     generate_regime_switch_episode,
 )
 from benchmark.evaluation.metrics import brute_force_optimum
 from benchmark.temporal_experiment import CONFIGURATIONS, compute_temporal_statistics
+
+logger = get_logger("recurrent_advantage")
 
 
 REGIME_LENGTH = 8
@@ -92,6 +95,7 @@ if __name__ == "__main__":
         mean_internal_energy=("internal_energy", "mean"),
         mean_gap=("absolute_gap", "mean"),
     )
-    print(summary.round(4).to_string(index=False))
-    print("\nPaired seed statistics:")
-    print(compute_temporal_statistics(result).round(4).to_string(index=False))
+    logger.info("Recurrent Advantage Benchmark Summary:")
+    logger.info("\n" + summary.round(4).to_string(index=False))
+    logger.info("\nPaired seed statistics:")
+    logger.info("\n" + compute_temporal_statistics(result).round(4).to_string(index=False))
