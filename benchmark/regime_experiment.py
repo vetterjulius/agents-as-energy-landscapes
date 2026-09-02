@@ -2,10 +2,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from benchmark.logging_config import get_logger
 from benchmark.dynamic_benchmark import (
     MultiEpisodeSimulator,
     generate_regime_switch_episode,
 )
+
+logger = get_logger("regime_experiment")
 
 
 CONFIGURATIONS = {
@@ -124,4 +127,5 @@ def run_retention_sweep(
 if __name__ == "__main__":
     result = run_retention_sweep()
     summary = result.groupby(["sweep_parameter", "retention"], as_index=False).mean(numeric_only=True)
-    print(summary.to_string(index=False))
+    logger.info("Regime Experiment Summary:")
+    logger.info("\n" + summary.to_string(index=False))

@@ -4,14 +4,17 @@ import matplotlib.pyplot as plt
 import os
 import time
 from benchmark.config import config
+from benchmark.logging_config import get_logger
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.scenarios.independent import IndependentScenario
 from benchmark.baselines.greedy import GreedyOrchestrator
 from benchmark.baselines.energy_based import EnergyBasedOrchestrator
 from benchmark.evaluation.metrics import compute_energy
 
+logger = get_logger("sweep")
+
 def run_sweep():
-    print("Starting Weight Sweep...")
+    logger.info("Starting Weight Sweep")
 
     sweep_cfg = config.get("sweep", {})
     scenario_name = sweep_cfg.get("scenario", "Interaction")
@@ -30,7 +33,7 @@ def run_sweep():
     c_weights = sweep_cfg.get("cost_weights", [1.0])
 
     greedy = GreedyOrchestrator()
-    print("Evaluating Greedy baseline...")
+    logger.debug("Evaluating Greedy baseline")
     X_greedy = greedy.solve(problem)
     # Note: compute_energy uses default weights (1.0).
     # For a fair comparison in the sweep, we might need to compute energy with the swept weights.
@@ -39,7 +42,7 @@ def run_sweep():
     for iw in i_weights:
         for rw in r_weights:
             for cw in c_weights:
-                print(f"  Sweep: interaction={iw}, risk={rw}, cost={cw}")
+                logger.debug(f"Sweep: interaction={iw}, risk={rw}, cost={cw}")
 
                 # Update config for EnergyBasedOrchestrator
                 # We need to make sure the orchestrator uses these weights internally
@@ -71,7 +74,7 @@ def run_sweep():
     df.to_csv("results/sweep_results.csv", index=False)
 
     plot_sweep(df)
-    print("Sweep complete. Results saved in results/sweep_results.csv and results/plots/weight_sweep.png")
+    logger.info("Sweep complete. Results saved in results/sweep_results.csv and results/plots/weight_sweep.png")
 
 def compute_energy_with_weights(problem, X, iw, rw, cw):
     from energy.registry import EnergyRegistry

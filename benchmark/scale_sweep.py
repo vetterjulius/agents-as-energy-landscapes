@@ -6,13 +6,16 @@ import os
 import copy
 
 from benchmark.config import config
+from benchmark.logging_config import get_logger
 from benchmark.scenarios.interaction import InteractionScenario
 from benchmark.baselines.greedy import GreedyOrchestrator
 from benchmark.baselines.energy_based import EnergyPureSAOrchestrator, EnergyHybridOrchestrator, EnergyPureGreedyOrchestrator
 from benchmark.evaluation.metrics import compute_energy, load_balance, coordination_score, constraint_violations
 
+logger = get_logger("scale_sweep")
+
 def run_scale_sweep():
-    print("Starting Scale Sweep (Scaling Experiment)...")
+    logger.info("Starting Scale Sweep Experiment")
 
     seed = config.get("seed", 42)
     torch.manual_seed(seed)
@@ -40,7 +43,7 @@ def run_scale_sweep():
     # 1. Scale Tasks (Fix Agent count = 10)
     fixed_agents = 10
     for M in task_scales:
-        print(f"  Scaling Tasks Sweep: Agents={fixed_agents}, Tasks={M}...")
+        logger.debug(f"Scaling tasks: agents={fixed_agents}, tasks={M}")
         scenario = InteractionScenario(num_agents=fixed_agents, num_tasks=M, dim=8)
         problem = scenario.generate(seed)
 
@@ -65,7 +68,7 @@ def run_scale_sweep():
     # 2. Scale Agents (Fix Task count = 50)
     fixed_tasks = 50
     for N in agent_scales:
-        print(f"  Scaling Agents Sweep: Agents={N}, Tasks={fixed_tasks}...")
+        logger.debug(f"Scaling agents: agents={N}, tasks={fixed_tasks}")
         scenario = InteractionScenario(num_agents=N, num_tasks=fixed_tasks, dim=8)
         problem = scenario.generate(seed)
 
@@ -93,7 +96,7 @@ def run_scale_sweep():
     os.makedirs("results", exist_ok=True)
     df_tasks.to_csv("results/scaling_tasks_results.csv", index=False)
     df_agents.to_csv("results/scaling_agents_results.csv", index=False)
-    print("Saved scaling sweep results to results/scaling_tasks_results.csv and scaling_agents_results.csv")
+    logger.info("Saved scaling sweep results to results/scaling_tasks_results.csv and scaling_agents_results.csv")
 
     # Generate plots
     plot_scale_results(df_tasks, df_agents)
@@ -162,7 +165,7 @@ def plot_scale_results(df_tasks, df_agents):
     plt.savefig(f"{output_dir}/scaling_agents_runtime.png")
     plt.close()
 
-    print(f"Generated scaling plots in {output_dir}/")
+    logger.info(f"Generated scaling plots in {output_dir}/")
 
 if __name__ == "__main__":
     run_scale_sweep()

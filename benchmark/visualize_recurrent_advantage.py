@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from benchmark.logging_config import get_logger
+
+logger = get_logger("visualize")
+
 
 CONFIGURATION_ORDER = [
     "Static Energy",
@@ -162,8 +166,8 @@ def main():
     _save_paired_effects(statistics, args.output_dir)
     _save_episode_trajectories(raw, args.output_dir)
     _save_internal_external_scatter(raw, args.output_dir)
-    print(f"Verified {len(raw)} rows across {raw.seed.nunique()} seeds.")
-    print(f"Wrote 4 figures to {args.output_dir}")
+    logger.info(f"Verified {len(raw)} rows across {raw.seed.nunique()} seeds.")
+    logger.info(f"Wrote 4 figures to {args.output_dir}")
 
 
 if __name__ == "__main__":
