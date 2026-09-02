@@ -1,7 +1,7 @@
 import torch
 import random
 from typing import List
-from benchmarks.base import BaseBenchmark, BenchmarkScenario
+from trashbin.benchmarks.base import BaseBenchmark, BenchmarkScenario
 
 class SyntheticBenchmark(BaseBenchmark):
     def __init__(self, seed: int = 42):
