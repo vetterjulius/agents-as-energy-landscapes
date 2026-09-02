@@ -7,7 +7,7 @@ import os
 # Add the current directory to python path if not already present
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from original_system import EnergyModel
+from trashbin.original_system import EnergyModel
 from system import load_config
 from model.orchestrator import Orchestrator
 

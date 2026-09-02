@@ -2,7 +2,7 @@ import time
 import copy
 import torch
 from typing import Dict, List, Any, Callable
-from benchmarks.base import BaseBenchmark, BenchmarkScenario
+from trashbin.benchmarks.base import BaseBenchmark, BenchmarkScenario
 
 class BenchmarkRunner:
     def __init__(self, benchmark: BaseBenchmark, base_cfg: Dict[str, Any]):

@@ -9,11 +9,11 @@ import torch
 import yaml
 
 from benchmark.agentbench.adapter import AgentBenchAdapter
-from baselines.capability_matching import CapabilityMatchingOrchestrator
+from trashbin.capability_matching import CapabilityMatchingOrchestrator
 from baselines.random_baseline import RandomOrchestrator
 from orchestrator.base import Agent
 from orchestrator.executor import Executor
-from orchestrator.llm_planner import LLMPlannerOrchestrator
+from trashbin.llm_planner import LLMPlannerOrchestrator
 from orchestrator.energy_orchestrator import EnergyOrchestrator
 from orchestrator.ebmao_orchestrator import EBMAOOrchestrator
 from orchestrator.task_decomposer import TaskDecomposer
