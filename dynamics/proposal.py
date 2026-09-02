@@ -3,31 +3,6 @@ import torch
 
 
 class AssignmentProposal:
-    """
-    Proposal mechanism for the classical Energy-based orchestrator.
-
-    The proposal mechanism is deliberately separated from the sampler:
-
-        Proposal
-            -> generates a candidate X'
-
-        SimulatedAnnealingSampler
-            -> evaluates E(X')
-            -> computes dE
-            -> applies Metropolis acceptance
-
-    Therefore:
-
-        mode="random"
-            means random proposal generation.
-
-        mode="guided"
-            means energy-guided proposal generation.
-
-    The sampler remains responsible for deciding whether a proposal
-    is actually accepted.
-    """
-
     def __init__(
         self,
         energy_registry,
@@ -59,41 +34,7 @@ class AssignmentProposal:
                 f"Expected 'guided' or 'random'."
             )
 
-    # ==================================================================
-    # Public API
-    # ==================================================================
-
     def propose(self, state):
-        """
-        Generate one valid assignment proposal.
-
-        Random mode
-        -----------
-        Generates exactly one random single-task reassignment.
-
-        Guided mode
-        -----------
-        Uses a mixture of:
-            - guided single-task reassignment
-            - guided block reassignment
-            - random single-task reassignment
-            - exhaustive single-task reassignment
-
-        The proposal itself does NOT perform Metropolis acceptance.
-        Acceptance is handled exclusively by the sampler.
-
-        Returns
-        -------
-        torch.Tensor
-            Proposed assignment matrix X' with shape [N, M].
-
-        Invariant
-        ---------
-        Every task remains assigned to exactly one agent:
-
-            X'.sum(dim=0) == 1
-        """
-
         if self.mode == "random":
             X_prop = self._random_swap(state)
 

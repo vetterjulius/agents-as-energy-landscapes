@@ -28,17 +28,6 @@ class TemperatureController:
             )
 
     def apply(self, sampler_state):
-        """
-        Adapt the temperature based on the observed
-        acceptance rate.
-
-        If acceptance is too high:
-            decrease T.
-
-        If acceptance is too low:
-            increase T.
-        """
-
         error = self.target_accept - sampler_state.acc_rate
 
         # Multiplicative temperature adaptation.
@@ -52,7 +41,6 @@ class TemperatureController:
 
         sampler_state.T *= factor
 
-        # Keep temperature inside configured bounds.
         sampler_state.T = max(
             self.T_min,
             min(sampler_state.T, self.T_max),

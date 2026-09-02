@@ -3,7 +3,6 @@ import sys
 import argparse
 import logging
 
-# Add the current directory to python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from benchmark.logging_config import setup_logger
@@ -29,7 +28,6 @@ def main():
 
     args = parser.parse_args()
     
-    # Configure logging based on verbosity flag
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logger = setup_logger(level=log_level)
     

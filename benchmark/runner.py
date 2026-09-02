@@ -42,12 +42,6 @@ from benchmark.dynamic_benchmark import run_dynamic_benchmark
 logger = get_logger("runner")
 
 def deep_merge_config(base, overrides):
-    """
-    Recursively merge overrides into a copy of base.
-
-    Nested dictionaries are merged recursively.
-    Lists and scalar values are replaced completely.
-    """
     result = copy.deepcopy(base)
 
     for key, value in overrides.items():
@@ -63,30 +57,23 @@ def deep_merge_config(base, overrides):
     return result
 
 def apply_robustness_perturbations(problem, seed, cfg):
-    """
-    Applies configurable robustness perturbations (noise, agent failures, comm outages)
-    to a copy of the problem instance to test system resilience.
-    """
     torch.manual_seed(seed)
     random.seed(seed)
 
     perturbed = copy.deepcopy(problem)
     rob_cfg = cfg.get("robustness", {})
 
-    # 1. Capability Noise
     if rob_cfg.get("capability_noise", {}).get("enabled", False):
         level = rob_cfg["capability_noise"]["level"]
         for agent in perturbed.agents:
             noise = torch.randn_like(agent.capability_embedding) * level
             agent.capability_embedding = agent.capability_embedding + noise
 
-    # 2. Risk Weights Noise (Falsche Risikoschätzungen)
     if rob_cfg.get("risk_weights_noise", {}).get("enabled", False):
         level = rob_cfg["risk_weights_noise"]["level"]
         noise = torch.randn_like(perturbed.risk_weights) * level
         perturbed.risk_weights = perturbed.risk_weights + noise
 
-    # 3. Agent Failure (Randomly drop a percentage of agents)
     if rob_cfg.get("agent_failure", {}).get("enabled", False):
         rate = rob_cfg["agent_failure"]["rate"]
         num_failed = int(len(perturbed.agents) * rate)
@@ -95,7 +82,6 @@ def apply_robustness_perturbations(problem, seed, cfg):
             failed_indices = random.sample(all_indices, num_failed)
             perturbed.agents = [agent for idx, agent in enumerate(perturbed.agents) if idx not in failed_indices]
 
-    # 4. Communication Outages (Zero out some interaction connections)
     if rob_cfg.get("comm_outages", {}).get("enabled", False):
         rate = rob_cfg["comm_outages"]["rate"]
         mask = (torch.rand_like(perturbed.interaction_graph) > rate).float()

@@ -70,12 +70,9 @@ def run_coupling_sweep():
             "hybrid_cleanup_prob": 0.0,
         })
 
-        # The benchmark adapter uses training.iterations.
         current_cfg.setdefault("training", {})
         current_cfg["training"]["iterations"] = 25
 
-        # Keep the legacy solver configuration in sync for the
-        # classical Energy baselines that still consume it.
         current_cfg.setdefault("solver", {})
         current_cfg["solver"]["iterations"] = 25
 
@@ -145,7 +142,6 @@ def plot_coupling_results(df):
     output_dir = "results/plots"
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Energy vs Interaction Weight
     plt.figure(figsize=(10, 6))
 
     for name in df["Orchestrator"].unique():

@@ -7,14 +7,6 @@ from model.orchestrator import Orchestrator as SystemOrchestrator
 
 
 class EnergyBasedOrchestrator(Orchestrator):
-    """
-    Thin benchmark adapter for the canonical model.Orchestrator.
-
-    All Energy-based orchestration logic lives in model/orchestrator.py.
-    This class only converts a ProblemInstance into an OrchestrationState
-    and exposes the benchmark interface.
-    """
-
     def __init__(self, cfg, search_mode="hybrid", theta_mode="static"):
         self.cfg = cfg
         self.search_mode = search_mode

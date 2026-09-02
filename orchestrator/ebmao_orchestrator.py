@@ -8,8 +8,6 @@ from state.orchestration_state import OrchestrationState
 
 
 class EBMAOOrchestrator:
-    """Benchmark adapter around the canonical EBMAO implementation."""
-
     def __init__(self, cfg):
         self.cfg = cfg
         self.core = None
@@ -133,7 +131,6 @@ class EBMAOOrchestrator:
         M = len(problem.tasks)
         d = task_embeddings.shape[1]
 
-        # Initial assignment based on capability distance.
         X = torch.zeros(N, M)
 
         for task_idx, task in enumerate(problem.tasks):

@@ -1,5 +1,3 @@
-"""Whole system acts as if it was a single agent"""
-
 from orchestrator.energy_orchestrator import EnergyOrchestrator
 from orchestrator.executor import Executor
 from orchestrator.task_decomposer import TaskDecomposer

@@ -7,8 +7,6 @@ from orchestrator.base import Agent, Assignment, Task
 
 
 class Executor:
-    """Execute a decomposition and return a benchmark-compatible result."""
-
     def __init__(self, benchmark_task: BenchmarkTask):
         self.benchmark_task = benchmark_task
 

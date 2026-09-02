@@ -12,10 +12,6 @@ from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 
 class RandomOrchestrator(BaseOrchestrator):
     def __init__(self, cfg, initial_state=None, W_risk=None):
-        """
-        Random Orchestrator Baseline.
-        At each step, assigns each task to a random agent.
-        """
         self.cfg = cfg
         m = cfg["model"]
         self.N = m["num_agents"]

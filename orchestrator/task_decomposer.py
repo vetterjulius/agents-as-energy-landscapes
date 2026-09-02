@@ -9,8 +9,6 @@ from orchestrator.base import Task
 
 
 class TaskDecomposer:
-    """Decompose a benchmark instruction into a small task graph."""
-
     def __init__(self, dim: int = 8):
         if dim <= 0:
             raise ValueError("Task embedding dimension must be positive.")

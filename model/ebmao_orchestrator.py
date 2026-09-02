@@ -165,14 +165,12 @@ class EBMAOOrchestrator:
             return
 
         if self.search_mode == "pure_greedy":
-            # Pure Greedy search mode
             best_X, _, improved = self._find_best_reassignment()
             if improved:
                 self.state.X = best_X
             else:
                 self.converged = True
         else:
-            # SA or Hybrid modes
             accepted = self.sampler.step(self.state)
 
             if self.search_mode == "hybrid":

@@ -12,21 +12,6 @@ from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 
 class GreedyOrchestrator(BaseOrchestrator):
     def __init__(self, cfg, initial_state=None, W_risk=None, mode="local_improvement"):
-        """
-        Greedy Orchestrator Baseline.
-        
-        Args:
-            cfg: Configuration dictionary.
-            initial_state: Optional initial OrchestrationState.
-            W_risk: Optional risk weights.
-            mode: Greedy strategy. Supported values:
-                - "local_improvement": At each step, evaluates all single-task reassignments (M * (N - 1))
-                                       and makes the one that minimizes the total energy.
-                - "local_search": At each step, performs local reassignments until no single reassignment
-                                  further improves the energy (local minimum).
-                - "construction": Starts by greedily assigning each task one-by-one to the best agent,
-                                  and in subsequent steps, does local improvement.
-        """
         self.cfg = cfg
         m = cfg["model"]
         self.N = m["num_agents"]

@@ -25,7 +25,7 @@ class Agent:
 
 
 class Assignment(dict):
-    """Mapping from task id to agent id."""
+    pass
 
 
 class BaseOrchestrator(ABC):

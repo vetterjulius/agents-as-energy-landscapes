@@ -35,8 +35,6 @@ def run_sweep():
     greedy = GreedyOrchestrator()
     logger.debug("Evaluating Greedy baseline")
     X_greedy = greedy.solve(problem)
-    # Note: compute_energy uses default weights (1.0).
-    # For a fair comparison in the sweep, we might need to compute energy with the swept weights.
 
     import copy
     for iw in i_weights:
@@ -44,8 +42,6 @@ def run_sweep():
             for cw in c_weights:
                 logger.debug(f"Sweep: interaction={iw}, risk={rw}, cost={cw}")
 
-                # Update config for EnergyBasedOrchestrator
-                # We need to make sure the orchestrator uses these weights internally
                 current_cfg = copy.deepcopy(config)
                 current_cfg["model"]["interaction_weight"] = iw
                 current_cfg["model"]["risk_weight"] = rw
@@ -55,11 +51,9 @@ def run_sweep():
                 eb = EnergyBasedOrchestrator(current_cfg)
                 X_eb = eb.solve(problem)
 
-                # Compute energy for both using the CURRENT weights
                 E_eb, _ = compute_energy_with_weights(problem, X_eb, iw, rw, cw)
                 E_greedy, _ = compute_energy_with_weights(problem, X_greedy, iw, rw, cw)
 
-                # Ensure we store float values, not tensors
                 results.append({
                     "interaction_weight": iw,
                     "risk_weight": rw,
@@ -130,7 +124,6 @@ def plot_sweep(df):
         plt.ylabel("Energy Advantage (Greedy - EnergyBased)")
         plt.title(f"Energy Advantage vs {v}")
     else:
-        # Just plot index for now if multiple vary
         plt.plot(df.index, df["diff"], marker='o')
         plt.xlabel("Sweep Index")
         plt.ylabel("Energy Advantage")

@@ -91,10 +91,6 @@ def run_representation_ablations(problem, cfg):
     return results
 
 def run_solver_ablations(problem, cfg):
-    """
-    Step 6 - Solver Ablation
-    Compares different optimization strategies on the same energy model.
-    """
     N = len(problem.agents)
     M = len(problem.tasks)
     d = problem.agents[0].capability_embedding.shape[0]
@@ -114,7 +110,6 @@ def run_solver_ablations(problem, cfg):
         N=N, M=M, d=d
     )
 
-    # 1. Random Search
     best_X_random = X_init.clone()
     best_E_random = float('inf')
     for _ in range(cfg["solver"]["iterations"] * 10):
@@ -129,12 +124,8 @@ def run_solver_ablations(problem, cfg):
             best_E_random = E
             best_X_random = X_prop
 
-    # 2. Hill Climbing (Local Improvement)
     curr_X_hc = X_init.clone()
     from .baselines.greedy import GreedyOrchestrator
-    # We can use a trick here: GreedyOrchestrator with local_improvement mode
-    # But it needs to be initialized with our state.
-    # Let's just implement a simple loop.
     best_E_hc, _ = compute_energy(problem, curr_X_hc)
     for _ in range(cfg["solver"]["iterations"]):
         improved = False
@@ -154,7 +145,6 @@ def run_solver_ablations(problem, cfg):
             if improved: break
         if not improved: break
 
-    # 3. Simulated Annealing (Already our EnergyBasedOrchestrator)
     orch_sa = EnergyBasedOrchestrator(cfg)
     X_sa = orch_sa.solve(problem)
     E_sa, _ = compute_energy(problem, X_sa)

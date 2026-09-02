@@ -3,38 +3,6 @@ import torch
 
 
 class EBMAOAssignmentProposal:
-    """
-    Proposal mechanism for the EBMAO orchestrator.
-
-    The proposal mechanism only generates candidate assignments.
-
-    Acceptance is handled separately by SimulatedAnnealingSampler.
-
-    Modes
-    -----
-    random:
-        Generates a random single-task reassignment.
-
-    guided:
-        Generates EBMAO-aware proposals using:
-            - assignment distance
-            - capability/task alignment
-            - agent memory
-            - local energy evaluation
-
-    Thus:
-
-        EBMAO Pure SA
-            -> random proposal
-            -> SA / Metropolis acceptance
-
-        EBMAO Hybrid
-            -> guided proposal
-            -> multiple candidates in sampler
-            -> Metropolis acceptance
-            -> optional local refinement in orchestrator
-    """
-
     def __init__(
         self,
         energy_registry,
@@ -86,37 +54,7 @@ class EBMAOAssignmentProposal:
                 f"Expected 'guided' or 'random'."
             )
 
-    # ==================================================================
-    # Public proposal API
-    # ==================================================================
-
     def propose(self, state):
-        """
-        Generate one valid EBMAO assignment proposal.
-
-        IMPORTANT:
-            This method does NOT perform Metropolis acceptance.
-
-        It only generates X'.
-
-        In random mode:
-            one random task is reassigned.
-
-        In guided mode:
-            a mixture of EBMAO-aware proposal mechanisms is used.
-
-        Returns
-        -------
-        torch.Tensor
-            Proposed assignment matrix X' with shape [N, M].
-
-        Invariant
-        ---------
-        Every task remains assigned exactly once:
-
-            X'.sum(dim=0) == 1
-        """
-
         if self.mode == "random":
             X_prop = self._random_swap(state)
 
@@ -169,10 +107,6 @@ class EBMAOAssignmentProposal:
 
         return X_prop
 
-    # ==================================================================
-    # Guided proposal mechanisms
-    # ==================================================================
-
     def _guided_single_swap(self, state):
         """
         Select high-priority tasks according to the EBMAO assignment
@@ -190,15 +124,6 @@ class EBMAOAssignmentProposal:
         )
 
     def _guided_block_move(self, state):
-        """
-        Construct a guided multi-task proposal.
-
-        Selected tasks are improved sequentially using local energy
-        evaluations.
-
-        The final candidate is returned to the sampler, which decides
-        whether it is accepted.
-        """
 
         tasks = self._select_tasks(
             state,
@@ -210,31 +135,7 @@ class EBMAOAssignmentProposal:
             tasks,
         )
 
-    # ==================================================================
-    # Random proposal
-    # ==================================================================
-
     def _random_swap(self, state):
-        """
-        Randomly reassign exactly one task to another agent.
-
-        This is the proposal mechanism used by EBMAO Pure SA.
-
-        IMPORTANT:
-            Random proposal generation does not mean random acceptance.
-
-            The sampler subsequently applies:
-
-                dE <= 0
-                    -> accept
-
-                dE > 0
-                    -> accept with probability exp(-dE / T)
-
-        Assignment invariant:
-
-            X.sum(dim=0) == 1
-        """
 
         X_new = state.X.clone()
 
@@ -281,10 +182,6 @@ class EBMAOAssignmentProposal:
         ] = 1.0
 
         return X_new
-
-    # ==================================================================
-    # EBMAO-aware task selection
-    # ==================================================================
 
     def _select_tasks(self, state, k):
         """

@@ -165,14 +165,12 @@ class Orchestrator:
             return
 
         if self.search_mode == "pure_greedy":
-            # Pure Greedy search mode
             best_X, _, improved = self._find_best_reassignment()
             if improved:
                 self.state.X = best_X
             else:
                 self.converged = True
         else:
-            # SA or Hybrid modes
             accepted = self.sampler.step(self.state)
 
             if self.search_mode == "hybrid":
@@ -183,7 +181,7 @@ class Orchestrator:
                     if improved:
                         self.state.X = best_X
 
-                # Additional greedy cleanup (35% probability) for stronger exploitation.
+            
                 # Design choice: Hybrid mode intentionally favors exploitation over exploration
                 # to escape local minima found by SA and converge to better solutions faster.
                 if self.local_refine_steps > 0 and random.random() < 0.35:

@@ -33,21 +33,9 @@ class SimulatedAnnealingSampler:
 
     def step(self, state):
         X_old = state.X.clone()
-
-        # --------------------------------------------------------
-        # Energy of current state
-        # --------------------------------------------------------
         E_old, _ = self.energy_registry.compute(state)
         E_old = E_old.item()
 
-        # --------------------------------------------------------
-        # Pure SA
-        #
-        # Exactly ONE proposal is generated.
-        # The proposal mechanism itself is responsible for
-        # producing a random move when the orchestrator uses
-        # proposal mode="random".
-        # --------------------------------------------------------
         if self.mode == "sa":
 
             state.X = X_old
@@ -61,12 +49,6 @@ class SimulatedAnnealingSampler:
 
             dE = E_new - E_old
 
-        # --------------------------------------------------------
-        # Hybrid SA
-        #
-        # Generate several candidates and keep the lowest-energy
-        # candidate before applying the Metropolis criterion.
-        # --------------------------------------------------------
         else:  # self.mode == "hybrid"
 
             best_X = X_old.clone()
