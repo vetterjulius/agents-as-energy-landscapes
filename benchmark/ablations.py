@@ -154,3 +154,14 @@ def run_solver_ablations(problem, cfg):
         "Hill Climbing": best_E_hc,
         "Simulated Annealing": E_sa
     }
+
+def save_ablation_results(rep_results, sol_results, output_path="results/ablation_results.json"):
+    import json, os
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    data = {
+        "representation": rep_results,
+        "solver": sol_results
+    }
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+

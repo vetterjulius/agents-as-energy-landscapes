@@ -34,7 +34,8 @@ from benchmark.evaluation.metrics import (
 )
 from benchmark.evaluation.report import generate_markdown_report, save_csv_results
 from benchmark.evaluation.plots import plot_results
-from benchmark.ablations import run_representation_ablations, run_solver_ablations
+from benchmark.evaluation.comprehensive_report import generate_comprehensive_report, generate_experiment_summary
+from benchmark.ablations import run_representation_ablations, run_solver_ablations, save_ablation_results
 from benchmark.scale_sweep import run_scale_sweep
 from benchmark.coupling_sweep import run_coupling_sweep
 from benchmark.dynamic_benchmark import run_dynamic_benchmark
@@ -452,22 +453,26 @@ def run_benchmark(quick: bool = False):
         ablation_cfg,
     )
 
+    save_ablation_results(rep_ablation_results, sol_ablation_results)
+
+    # Merge Experiment 2 (solver_results) into world_results so all orchestrators appear in reports
+    consolidated_results = copy.deepcopy(world_results)
+    for s_name, s_orch_map in solver_results.items():
+        if s_name not in consolidated_results:
+            consolidated_results[s_name] = {}
+        for o_name, o_metrics in s_orch_map.items():
+            if o_name not in consolidated_results[s_name]:
+                consolidated_results[s_name][o_name] = o_metrics
+
     # ------------------------------------------------------------
-    # Reporting
+    # Reporting - Initial Results
     # ------------------------------------------------------------
-    logger.info("Generating reports for Experiment 1")
-    logger.debug(f"  Processing {len(world_results)} scenario results")
+    logger.info("Generating initial reports for Experiments 1 & 2")
+    logger.debug(f"  Processing {len(consolidated_results)} scenario results")
 
-    generate_markdown_report(world_results)
-    save_csv_results(world_results)
-    plot_results(world_results)
-
-    logger.info("Generating reports for Experiment 2")
-    logger.debug(f"  Processing {len(solver_results)} scenario results")
-
-    generate_markdown_report(solver_results)
-    save_csv_results(solver_results)
-    plot_results(solver_results)
+    generate_markdown_report(consolidated_results)
+    save_csv_results(consolidated_results)
+    plot_results(consolidated_results)
 
     # ------------------------------------------------------------
     # Ablation summary
@@ -503,18 +508,41 @@ def run_benchmark(quick: bool = False):
     else:
         logger.info("Skipping Dynamic & Long-Horizon Adaptation Benchmark")
 
+    # ------------------------------------------------------------
+    # Generate Comprehensive Final Report
+    # ------------------------------------------------------------
+    logger.info("=" * 70)
+    logger.info("Generating Comprehensive Final Report")
+    logger.info("=" * 70)
+    
+    # Combine all results for comprehensive report
+    logger.info("Consolidating all experiment results...")
+    generate_comprehensive_report(consolidated_results)
+    generate_experiment_summary()
+    
     # Final summary
     logger.info("=" * 70)
     logger.info("Benchmark Complete")
     logger.info("=" * 70)
     logger.info("Results saved to:")
+    logger.info("  - results/benchmark_report.md (comprehensive markdown report)")
+    logger.info("  - results/figure_catalog.md (detailed figure documentation)")
+    logger.info("  - results/experiment_summary.md (execution summary)")
     logger.info("  - results/benchmark_results.csv (raw per-run data)")
-    logger.info("  - results/benchmark_results_summary.csv (aggregated)")
-    logger.info("  - results/benchmark_report.md (markdown report)")
-    logger.info("  - results/figure_catalog.md (figure descriptions)")
+    logger.info("  - results/benchmark_results_summary.csv (aggregated statistics)")
     logger.info("  - results/plots/ (all visualization figures)")
-    logger.info("  - results/ebmao_vs_world_20seeds.csv")
-    logger.info("  - results/recurrent_advantage_benchmark_20seeds_statistics.csv")
+    
+    # List additional experiment results
+    logger.info("\nAdditional Experiment Results:")
+    if cfg.get("run_scale_sweep", True):
+        logger.info("  - results/scaling_tasks_results.csv")
+        logger.info("  - results/scaling_agents_results.csv")
+    if cfg.get("run_coupling_sweep", True):
+        logger.info("  - results/coupling_results.csv")
+    if cfg.get("run_dynamic_benchmark", True):
+        logger.info("  - results/dynamic_adaptation_metrics.csv")
+        logger.info("  - results/dynamic_*_*.csv (scenario-specific results)")
+    
     logger.info("=" * 70)
 
 if __name__ == "__main__":
