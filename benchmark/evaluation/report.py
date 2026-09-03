@@ -72,7 +72,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
             f.write("Comparison of energy-based solvers against the baseline with lowest mean energy.\n\n")
 
             # Find best baseline
-            baselines = ["Random", "Capability Matching (Greedy)", "GreedyLB", "RuleBased", "Beam Search", "Tabu Search"]
+            baselines = ["Random", "Capability Matching (Greedy)", "GreedyLB", "RuleBased", "Beam Search", "Tabu Search", "Market Auction (SOTA)"]
             best_base_name = None
             best_base_energy = float('inf')
 

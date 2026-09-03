@@ -17,6 +17,7 @@ from benchmark.baselines.greedy_load_balancing import GreedyLoadBalancingOrchest
 from benchmark.baselines.rule_based import RuleBasedOrchestrator
 from benchmark.baselines.beam_search import BeamSearchOrchestrator
 from benchmark.baselines.tabu_search import TabuSearchOrchestrator
+from benchmark.baselines.auction import MarketAuctionOrchestrator
 from benchmark.baselines.energy_based import (
     EnergyPureSAOrchestrator,
     EnergyHybridOrchestrator,
@@ -304,6 +305,11 @@ def run_benchmark(quick: bool = False):
                 "tabu_tenure",
                 5,
             ),
+        ),
+
+        "Market Auction (SOTA)": MarketAuctionOrchestrator(
+            alpha_load=0.5,
+            beta_synergy=0.5,
         ),
 
         "Energy (Hybrid)": EnergyHybridOrchestrator(
