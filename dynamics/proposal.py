@@ -228,6 +228,10 @@ class AssignmentProposal:
             - self.lambda_align * alignment
         )
 
+        if hasattr(state, "Theta") and hasattr(state, "C"):
+            coupling_deg = state.Theta.abs().sum(dim=1) + state.C.abs().sum(dim=1)
+            importance = importance + 0.1 * coupling_deg
+
         _, top_indices = torch.topk(
             importance,
             k,
@@ -344,16 +348,22 @@ class AssignmentProposal:
 
         The final block candidate is returned to the sampler, which
         decides whether the complete proposal is accepted.
+        Construct a guided multi-task proposal evaluating sequential task moves
+        and joint block assignments across candidate agents.
         """
 
         X_orig = state.X.clone()
         X_prop = X_orig.clone()
+        best_X = X_orig.clone()
 
         best_E, _ = self.energy_registry.compute(
             state
         )
         best_E = best_E.item()
 
+        X_prop = X_orig.clone()
+
+        # 1. Sequential task moves
         for task_idx in tasks:
 
             old_agent = torch.argmax(
@@ -371,6 +381,8 @@ class AssignmentProposal:
             for new_agent in candidate_agents:
 
                 X_trial = X_prop.clone()
+                X_trial[old_agent, task_idx] = 0.0
+                X_trial[new_agent, task_idx] = 1.0
 
                 X_trial[
                     old_agent,
@@ -387,6 +399,7 @@ class AssignmentProposal:
                 E, _ = self.energy_registry.compute(
                     state
                 )
+                E, _ = self.energy_registry.compute(state)
                 E_val = E.item()
 
                 if E_val < best_local_E:
@@ -397,11 +410,29 @@ class AssignmentProposal:
 
             if best_local_E < best_E:
                 best_E = best_local_E
+                best_X = X_prop.clone()
+
+        # 2. Joint block assignment: move all selected tasks together to candidate agents
+        for new_agent in range(state.N):
+            X_joint = X_orig.clone()
+            for t_idx in tasks:
+                old_a = torch.argmax(X_joint[:, t_idx]).item()
+                X_joint[old_a, t_idx] = 0.0
+                X_joint[new_agent, t_idx] = 1.0
+
+            state.X = X_joint
+            E_joint, _ = self.energy_registry.compute(state)
+            E_val = E_joint.item()
+
+            if E_val < best_E:
+                best_E = E_val
+                best_X = X_joint.clone()
 
         # Restore original state before returning proposal.
         state.X = X_orig
 
         return X_prop
+        return best_X
 
     # ==================================================================
     # Exhaustive reassignment

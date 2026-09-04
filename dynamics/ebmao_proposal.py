@@ -259,7 +259,7 @@ class EBMAOAssignmentProposal:
         )
 
         # --------------------------------------------------------------
-        # EBMAO task importance
+        # EBMAO task importance & inter-task coupling
         # --------------------------------------------------------------
 
         importance = (
@@ -267,6 +267,11 @@ class EBMAOAssignmentProposal:
             - self.lambda_align * alignment
             - self.lambda_memory * memory_alignment
         )
+
+        # Include coupling strength (Theta + C) to select strongly interacting tasks together
+        if hasattr(state, "Theta") and hasattr(state, "C"):
+            coupling_deg = state.Theta.abs().sum(dim=1) + state.C.abs().sum(dim=1)
+            importance = importance + 0.1 * coupling_deg
 
         _, top_indices = torch.topk(
             importance,
@@ -378,25 +383,22 @@ class EBMAOAssignmentProposal:
 
     def _best_block_move(self, state, tasks):
         """
-        Construct a sequentially improved block proposal.
-
-        Each selected task is considered using the current intermediate
-        block assignment.
-
-        The complete block proposal is returned to the sampler.
+        Construct a block proposal evaluating both sequential task moves
+        and joint block assignments across candidate agents.
         """
 
         X_orig = state.X.clone()
-
-        X_prop = X_orig.clone()
+        best_X = X_orig.clone()
 
         best_E, _ = self.energy_registry.compute(
             state
         )
         best_E = best_E.item()
 
-        for task_idx in tasks:
+        X_prop = X_orig.clone()
 
+        # 1. Sequential task moves inside block
+        for task_idx in tasks:
             old_agent = torch.argmax(
                 X_prop[:, task_idx]
             ).item()
@@ -410,24 +412,12 @@ class EBMAOAssignmentProposal:
             best_local_E = best_E
 
             for new_agent in candidates:
-
                 X_trial = X_prop.clone()
-
-                X_trial[
-                    old_agent,
-                    task_idx,
-                ] = 0.0
-
-                X_trial[
-                    new_agent,
-                    task_idx,
-                ] = 1.0
+                X_trial[old_agent, task_idx] = 0.0
+                X_trial[new_agent, task_idx] = 1.0
 
                 state.X = X_trial
-
-                E, _ = self.energy_registry.compute(
-                    state
-                )
+                E, _ = self.energy_registry.compute(state)
                 E_val = E.item()
 
                 if E_val < best_local_E:
@@ -435,14 +425,30 @@ class EBMAOAssignmentProposal:
                     best_local_X = X_trial.clone()
 
             X_prop = best_local_X
-
             if best_local_E < best_E:
                 best_E = best_local_E
+                best_X = X_prop.clone()
+
+        # 2. Joint block assignment: move all selected tasks together to candidate agents
+        for new_agent in range(state.N):
+            X_joint = X_orig.clone()
+            for t_idx in tasks:
+                old_a = torch.argmax(X_joint[:, t_idx]).item()
+                X_joint[old_a, t_idx] = 0.0
+                X_joint[new_agent, t_idx] = 1.0
+
+            state.X = X_joint
+            E_joint, _ = self.energy_registry.compute(state)
+            E_val = E_joint.item()
+
+            if E_val < best_E:
+                best_E = E_val
+                best_X = X_joint.clone()
 
         # Restore original state.
         state.X = X_orig
 
-        return X_prop
+        return best_X
 
     # ==================================================================
     # Exhaustive single-task reassignment
