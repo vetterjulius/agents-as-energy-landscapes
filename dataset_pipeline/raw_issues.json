@@ -1,0 +1,45 @@
+[
+  {
+    "id": "GH-6146",
+    "number": 6146,
+    "title": "Add Cloudflare to Flask Hosting Platforms docs?",
+    "body": "Cloudflare workers supports deploying Flask applications. We have the following short guide for deploying Flask workers:\nhttps://developers.cloudflare.com/workers/languages/python/packages/flask/\n\nCould we add a link to this page to the \"Hosting Platforms\" section of the docs?",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6146"
+  },
+  {
+    "id": "GH-6143",
+    "number": 6143,
+    "title": "`add_url_rule` leaves a route registered even after an endpoint conflict",
+    "body": "## Description\n\u2018add_url_rule\u2019 correctly raises an error when an endpoint already exists and you try to register a different view function with the same endpoint.\n\nHowever, after you catch the error and continue running the code, the URL you tried to add (/b, for example) still exists. When a user requests /b, it is routed to the view function that was already registered for that endpoint, rather than the new view function whose registration failed.\n\n## Example\n\n```python\nfrom flask import Flask\n\napp = Flask(__name__)\n\ndef first():\n    return \"first\"\n\ndef second():\n    return \"second\"\n\napp.add_url_rule(\"/a\", endpoint=\"same\", view_func=first)\n\ntry:\n    app.add_url_rule(\"/b\", endpoint=\"same\", view_func=second)\nexcept AssertionError as e:\n    print(e)\n\nclient = app.test_client()\n\nprint(client.get(\"/a\").status_code, client.get(\"/a\").data)\nprint(client.get(\"/b\").status_code, client.get(\"/b\").data)\n```\n\n### Expected Result\n\n```text\nView function mapping is overwriting an existing endpoint fun",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6143"
+  },
+  {
+    "id": "GH-6139",
+    "number": 6139,
+    "title": "AI junk",
+    "body": "## Summary\n\nMultiple security vulnerabilities in Flask: CRITICAL code execution via exec() in config.py, HIGH path traversal in 5 locations.\n\n## Vulnerabilities Found\n\n1. **CRITICAL** `config.py:209` - Code Execution via exec() in from_pyfile\n   exec(compile(config_file.read(), filename, \"exec\"), d.__dict__) executes arbitrary Python code from a file.\n\n2. **HIGH** `config.py:204` - Path Traversal in from_pyfile\n   filename = os.path.join(self.root_path, filename) without sanitization. Absolute paths bypass root_path.\n\n3. **HIGH** `config.py:290` - Path Traversal in from_file\n   Same os.path.join pattern without validation.\n\n4. **HIGH** `app.py:441` - Path Traversal in open_resource\n   path = os.path.join(self.root_path, resource) without path validation.\n\n5. **HIGH** `app.py:463` - Path Traversal in open_instance_resource\n   Same pattern.\n\n6. **HIGH** `blueprints.py:123` - Path Traversal in open_resource\n   os.path.join without traversal protection.\n\n7. **MEDIUM** `cli.py:1023` - Code ",
+    "labels": [],
+    "file_references": [
+      "config.py",
+      "app.py",
+      "blueprints.py",
+      "cli.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6139"
+  },
+  {
+    "id": "GH-6126",
+    "number": 6126,
+    "title": "AI junk",
+    "body": "## Executive summary\n\n- **[critical]** Exposed GitHub token in app/config.py \u2014 A hard-coded personal access token was found in the repository.\n- **[medium]** Duplicate issues across languages \u2014 Issues #12 and #19 describe the same bug in English and Arabic.\n- **[low]** README missing usage and license sections \u2014 The README covers the project and installation only.",
+    "labels": [],
+    "file_references": [
+      "app/config.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6126"
+  }
+]

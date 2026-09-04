@@ -1,0 +1,530 @@
+[
+  {
+    "id": "GH-6146",
+    "number": 6146,
+    "title": "Add Cloudflare to Flask Hosting Platforms docs?",
+    "body": "Cloudflare workers supports deploying Flask applications. We have the following short guide for deploying Flask workers:\nhttps://developers.cloudflare.com/workers/languages/python/packages/flask/\n\nCould we add a link to this page to the \"Hosting Platforms\" section of the docs?",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6146"
+  },
+  {
+    "id": "GH-6143",
+    "number": 6143,
+    "title": "`add_url_rule` leaves a route registered even after an endpoint conflict",
+    "body": "## Description\n\u2018add_url_rule\u2019 correctly raises an error when an endpoint already exists and you try to register a different view function with the same endpoint.\n\nHowever, after you catch the error and continue running the code, the URL you tried to add (/b, for example) still exists. When a user requests /b, it is routed to the view function that was already registered for that endpoint, rather than the new view function whose registration failed.\n\n## Example\n\n```python\nfrom flask import Flask\n\napp = Flask(__name__)\n\ndef first():\n    return \"first\"\n\ndef second():\n    return \"second\"\n\napp.add_url_rule(\"/a\", endpoint=\"same\", view_func=first)\n\ntry:\n    app.add_url_rule(\"/b\", endpoint=\"same\", view_func=second)\nexcept AssertionError as e:\n    print(e)\n\nclient = app.test_client()\n\nprint(client.get(\"/a\").status_code, client.get(\"/a\").data)\nprint(client.get(\"/b\").status_code, client.get(\"/b\").data)\n```\n\n### Expected Result\n\n```text\nView function mapping is overwriting an existing endpoint fun",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6143"
+  },
+  {
+    "id": "GH-6139",
+    "number": 6139,
+    "title": "AI junk",
+    "body": "## Summary\n\nMultiple security vulnerabilities in Flask: CRITICAL code execution via exec() in config.py, HIGH path traversal in 5 locations.\n\n## Vulnerabilities Found\n\n1. **CRITICAL** `config.py:209` - Code Execution via exec() in from_pyfile\n   exec(compile(config_file.read(), filename, \"exec\"), d.__dict__) executes arbitrary Python code from a file.\n\n2. **HIGH** `config.py:204` - Path Traversal in from_pyfile\n   filename = os.path.join(self.root_path, filename) without sanitization. Absolute paths bypass root_path.\n\n3. **HIGH** `config.py:290` - Path Traversal in from_file\n   Same os.path.join pattern without validation.\n\n4. **HIGH** `app.py:441` - Path Traversal in open_resource\n   path = os.path.join(self.root_path, resource) without path validation.\n\n5. **HIGH** `app.py:463` - Path Traversal in open_instance_resource\n   Same pattern.\n\n6. **HIGH** `blueprints.py:123` - Path Traversal in open_resource\n   os.path.join without traversal protection.\n\n7. **MEDIUM** `cli.py:1023` - Code ",
+    "labels": [],
+    "file_references": [
+      "cli.py",
+      "app.py",
+      "blueprints.py",
+      "config.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6139"
+  },
+  {
+    "id": "GH-6126",
+    "number": 6126,
+    "title": "AI junk",
+    "body": "## Executive summary\n\n- **[critical]** Exposed GitHub token in app/config.py \u2014 A hard-coded personal access token was found in the repository.\n- **[medium]** Duplicate issues across languages \u2014 Issues #12 and #19 describe the same bug in English and Arabic.\n- **[low]** README missing usage and license sections \u2014 The README covers the project and installation only.",
+    "labels": [],
+    "file_references": [
+      "app/config.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6126"
+  },
+  {
+    "id": "GH-6123",
+    "number": 6123,
+    "title": "`stream_with_context`: abandoned generator leaves the app context current on the worker thread; later requests skip `teardown_appcontext`",
+    "body": "`stream_with_context` pushes the request's contexts onto whichever thread iterates the response body, and pops them only if the generator completes or is closed on that same thread. When a client disconnects mid-stream, the server abandons the body iterator and GC finalizes it later \u2014 often on a different thread. That cross-context pop fails (`LookupError`/`ValueError` from `ContextVar.reset`, swallowed as \"Exception ignored in ...\"), and the app context stays current on the worker thread.\n\nBecause `RequestContext.push` reuses an ambient app context of the same app, every later request on that pooled thread runs under the stuck context and `teardown_appcontext` never fires for it. Anything keyed to the app context then leaks once per thread for the life of the process \u2014 with Flask-SQLAlchemy that is one connection held idle-in-transaction per poisoned thread, with nothing in the logs.\n\nRelated: #5774 fixed the same cross-context token failure for async views; #5804 covers teardown orde",
+    "labels": [],
+    "file_references": [
+      "/flask/ctx.py",
+      "/flask/helpers.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6123"
+  },
+  {
+    "id": "GH-6122",
+    "number": 6122,
+    "title": "Add async view pattern guide with Quart migration",
+    "body": "Document async view patterns in Flask and migration path to Quart for native async support.",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6122"
+  },
+  {
+    "id": "GH-6120",
+    "number": 6120,
+    "title": "Update tests for Werkzeug deprecated header parsing helpers",
+    "body": "## Description\n\nFlask tests currently use deprecated Werkzeug header parsing helpers:\n\n- `parse_cache_control_header`\n- `parse_set_header`\n\nWhen running tests against Werkzeug main, these functions emit `DeprecationWarning`, which causes test collection to fail because warnings are treated as errors.\n\n## Expected behavior\n\nTests should use the new Werkzeug APIs:\n\n- `RequestCacheControl.from_header`\n- `HeaderSet.from_header`\n\n## Environment\n\n- Flask main branch\n- Werkzeug main branch\n- Python 3.10+\n\n## Reproduction\n\nRun:\n\n- `uv run --locked --no-default-groups --group dev tox run`\n\n\nThe test suite fails during collection because deprecated Werkzeug functions raise `DeprecationWarning`.",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6120"
+  },
+  {
+    "id": "GH-6119",
+    "number": 6119,
+    "title": "AI junk",
+    "body": "## Summary\n\n`Config.from_prefixed_env` can raise an uncaught `TypeError` when an environment\nvariable creates a scalar configuration value and another variable later tries\nto use that same value as a nested mapping.\n\n### Reproduction\n\nWith Flask's development source at commit\n`6a2f545bfd8ed31e19066a299296917e034aca58`:\n\n```bash\nFLASK_FOO=bar FLASK_FOO__BAR=baz python - <<'PY'\nfrom flask import Flask\n\napp = Flask(__name__)\napp.config.from_prefixed_env()\nPY\n```\n\nThe call raises:\n\n```text\nTypeError: 'str' object does not support item assignment\n```\n\n### What happens\n\n`from_prefixed_env` processes matching environment variables in sorted order.\nThe first variable sets `config[\"FOO\"]` to the string `\"bar\"`. When processing\n`FLASK_FOO__BAR`, the nested traversal reaches this value and then attempts to\nassign through it:\n\n```python\ncurrent = current[part]\n...\ncurrent[tail] = value\n```\n\nThe intermediate value is a string rather than a mapping, so configuration\nloading fails with a low-level `T",
+    "labels": [],
+    "file_references": [
+      "com/pallets/flask/blob/6a2f545bfd8ed31e19066a299296917e034aca58/src/flask/config.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6119"
+  },
+  {
+    "id": "GH-6114",
+    "number": 6114,
+    "title": "jsonify emits NaN and Infinity, which are not valid JSON",
+    "body": "`jsonify` serialises `float(\"nan\")` and `float(\"inf\")` as the bare literals `NaN` and `Infinity`. Those are not valid JSON (RFC 8259 allows only decimal numbers), so the response is served as `application/json` but cannot be parsed by a strict parser, including the browser's `JSON.parse`.\n\nThis inherits from `json.dumps`, whose `allow_nan` defaults to `True`. `DefaultJSONProvider` sets `default`, `ensure_ascii` and `sort_keys`, but never touches `allow_nan`, so the permissive default applies.\n\nThe path to it is ordinary: any average, ratio or division that can meet an empty input produces `nan` without anything looking wrong on the server.\n\nReplication:\n\n```python\nfrom flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.route(\"/stats\")\ndef stats():\n    values = []\n    mean = sum(values) / len(values) if values else float(\"nan\")\n    return jsonify({\"count\": len(values), \"mean\": mean})\n\nwith app.test_client() as c:\n    r = c.get(\"/stats\")\n    print(r.headers[\"Content-Type\"])      # ",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6114"
+  },
+  {
+    "id": "GH-6107",
+    "number": 6107,
+    "title": "Confusing docstring in Flask.get_send_file_max_age and Flask.send_static_file",
+    "body": "This is a documentation issue rather than a functional bug.\n\nThe docstrings for the following methods:\n\n- `Flask.get_send_file_max_age`\n- `Flask.send_static_file`\n\ncontain the sentence:\n\n> \"Note this is a duplicate of the same method in the Flask class.\"\n\nHowever, both methods are already defined within the `Flask` class itself. As written, the statement is confusing because it suggests the methods duplicate another implementation in the `Flask` class, even though they are the implementations in that class.\n\nUpdating or removing this sentence would improve the clarity and accuracy of the source code documentation.\n\n## Steps to reproduce\n\n1. Open `src/flask/app.py`.\n2. Locate the `get_send_file_max_age` and `send_static_file` methods.\n3. Read the docstrings for both methods.\n\n## Expected behavior\n\nThe docstrings should accurately describe the methods without stating that they are duplicates of the same methods in the `Flask` class. The wording should be updated or removed to avoid confu",
+    "labels": [],
+    "file_references": [
+      "src/flask/app.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6107"
+  },
+  {
+    "id": "GH-6093",
+    "number": 6093,
+    "title": "IPv6 addresses parsed incorrectly because of `.partition(\":\")`?",
+    "body": "Hi, I checked the code and saw that two places use `.partition(\":\")` on addresses, and IPv6 addresses contain \":\".\n\nThis breaks 1. `session_transaction` value setting, and 2. `Flask.run()` if `SERVER_NAME` is set. I've already prepared two tests that fail, you can use them to reproduce:\n\n1. In `test_testing.py`\n```\ndef test_session_transaction_ipv6(app):\n    base_url = \"http://[::1]:8000/\"\n    client = app.test_client()\n\n    @app.get(\"/\")\n    def index():\n        return str(flask.session.get(\"value\"))\n\n    with client.session_transaction(base_url=base_url) as sess:\n        sess[\"value\"] = 42\n\n    assert client.get(\"/\", base_url=base_url).text == \"42\"\n```\n\n2. Add one case to `test_run_from_config`\n```\n(None, None, \"[::1]:8080\", \"::1\", 8080),\n```\n\nIs this known and intended? I could send the patches for these two places.",
+    "labels": [],
+    "file_references": [
+      "test_testing.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6093"
+  },
+  {
+    "id": "GH-6092",
+    "number": 6092,
+    "title": "test_bad_environ_raises_bad_request fails with Werkzeug>=3.1.7",
+    "body": "```pytb\n_____________________ test_bad_environ_raises_bad_request ______________________\n\n    def test_bad_environ_raises_bad_request():\n        app = flask.Flask(__name__)\n    \n        from flask.testing import EnvironBuilder\n    \n        builder = EnvironBuilder(app)\n        environ = builder.get_environ()\n    \n        # use a non-printable character in the Host - this is key to this test\n        environ[\"HTTP_HOST\"] = \"\\x8a\"\n    \n        with app.request_context(environ):\n            response = app.full_dispatch_request()\n>       assert response.status_code == 400\nE       assert 404 == 400\nE        +  where 404 = <Response streamed [404 NOT FOUND]>.status_code\n\ntests/test_reqctx.py:293: AssertionError\n```\n\n<!--\nDescribe how to replicate the bug.\n\nInclude a minimal reproducible example that demonstrates the bug.\nInclude the full traceback if there was an exception.\n-->\n\nRun the test suite against Werkzeug>=3.1.7 to reprodudce.\n\n<!--\nDescribe the expected behavior that should have hap",
+    "labels": [],
+    "file_references": [
+      "tests/test_reqctx.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6092"
+  },
+  {
+    "id": "GH-6071",
+    "number": 6071,
+    "title": "Tests fail with pytest 9.1: _pytest.monkeypatch.notset removed",
+    "body": "Flask's test suite imports the private notset sentinel from _pytest.monkeypatch in both tests/conftest.py and tests/test_cli.py. pytest 9.1 removed this attribute, moving it to _pytest.compat.NOTSET. This causes a collection-time crash \u2014 no tests can run at all.\n\n### Reproducing\n```\npip install -e . pytest==9.1.1\npytest tests/\ntests/test_cli.py:14: in <module>\n    from _pytest.monkeypatch import notset\nE   ImportError: cannot import name 'notset' from '_pytest.monkeypatch'\n```\nEven after fixing test_cli.py, every test fails because tests/conftest.py accesses monkeypatch.notset as a module attribute in the _standard_os_environ session fixture:\n\n`tests/conftest.py:19: AttributeError: module '_pytest.monkeypatch' has no attribute 'notset'`\n### Expected Behavior\nThe test suite should work with pytest 9.1+.\n\n### Environment:\n\nPython version: 3.15.0b2\nFlask version: 3.1.3",
+    "labels": [],
+    "file_references": [
+      "tests/conftest.py",
+      "tests/test_cli.py",
+      "test_cli.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6071"
+  },
+  {
+    "id": "GH-6071",
+    "number": 6071,
+    "title": "Tests fail with pytest 9.1: _pytest.monkeypatch.notset removed",
+    "body": "Flask's test suite imports the private notset sentinel from _pytest.monkeypatch in both tests/conftest.py and tests/test_cli.py. pytest 9.1 removed this attribute, moving it to _pytest.compat.NOTSET. This causes a collection-time crash \u2014 no tests can run at all.\n\n### Reproducing\n```\npip install -e . pytest==9.1.1\npytest tests/\ntests/test_cli.py:14: in <module>\n    from _pytest.monkeypatch import notset\nE   ImportError: cannot import name 'notset' from '_pytest.monkeypatch'\n```\nEven after fixing test_cli.py, every test fails because tests/conftest.py accesses monkeypatch.notset as a module attribute in the _standard_os_environ session fixture:\n\n`tests/conftest.py:19: AttributeError: module '_pytest.monkeypatch' has no attribute 'notset'`\n### Expected Behavior\nThe test suite should work with pytest 9.1+.\n\n### Environment:\n\nPython version: 3.15.0b2\nFlask version: 3.1.3",
+    "labels": [],
+    "file_references": [
+      "tests/conftest.py",
+      "tests/test_cli.py",
+      "test_cli.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6071"
+  },
+  {
+    "id": "GH-6068",
+    "number": 6068,
+    "title": "Flask logging not working as expected",
+    "body": "Hi all and thank you very much for the great programm and the immense work!\n\nI have trouble getting the logging feature to work properly, see test files attached.\n\nThe root logger is configured to write to a log file. \nWriting to the logs from my main application works fine.\nWriting to the logs form a test module works fine.\nLogging of werkzeug seems to work fine. It states:\n`2026-06-30 20:36:11,504:INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead\n * Running on http://127.0.0.1:5000\n2026-06-30 20:36:11,504:INFO:werkzeug:Press CTRL+C to quit`\n\nIn the terminal window however I can see still parts which are not redirected to the logging file and just printed to the console:\n\n` * Serving Flask app 'test_flask'\n * Debug mode: off\n`\n\nI would have expected that all output is redirect to the logs.\n\n**Steps to reproduce**\nRun the attached test case\n\n\n**Environment:**\n\n- Python version: 3.11\n- Flask version: 3.1.3",
+    "labels": [],
+    "file_references": [
+      "com/user-attachments/files/29519711/test_module.py",
+      "test_flask.py",
+      "com/user-attachments/files/29519707/test_flask.py",
+      "test_module.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6068"
+  },
+  {
+    "id": "GH-6065",
+    "number": 6065,
+    "title": "Add a query() route shortcut and MethodView support for HTTP QUERY (RFC 10008)",
+    "body": "The HTTP `QUERY` method was standardized in\n[RFC 10008](https://www.rfc-editor.org/info/rfc10008/) (June 2026): a safe,\nidempotent request method that carries content in the request body (the\nstandardized replacement for the \"use POST for a read-only query with a large\nbody\" workaround in GraphQL / REST search APIs).\n\nI'd like Flask to treat `QUERY` as a first-class method like the others:\n\n- a `query()` route shortcut on `Scaffold` (inherited by `Flask` and\n  `Blueprint`), mirroring `get`/`post`/`put`/`delete`/`patch`;\n- `MethodView` dispatch of `QUERY` to a `query` handler (add `\"query\"` to\n  `views.http_method_funcs`).\n\n---\n\nIs this solvable without changes to Flask? Partly \u2014 `@app.route(\"/x\",\nmethods=[\"QUERY\"])` already works today, since Flask doesn't restrict method\nnames and Werkzeug parses the body. What's missing is the ergonomic shortcut and\n`MethodView` dispatch that every other common method already has, so this is a\nconsistency/ergonomics gap rather than new capability \u2014 t",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6065"
+  },
+  {
+    "id": "GH-6059",
+    "number": 6059,
+    "title": "AI spam",
+    "body": "## \ud83c\udf93 Project Showcase\n\nI built **Exam AI** - an intelligent exam preparation assistant using Flask for the web interface and Ollama for local LLM integration.\n\n### \u2728 Features\n- \ud83c\udf10 **Flask Web UI** - Clean, responsive interface for exam practice\n- \ud83e\udd16 **Ollama Integration** - Local LLM for AI-powered explanations\n- \ud83d\udcdd **Question Bank** - Manage questions by exam type and subject\n- \u274c **Wrong Question Tracker** - Automatic tracking with spaced repetition\n- \ud83d\udcca **Statistics Dashboard** - Visual progress tracking\n- \ud83d\udcbb **CLI Tool** - Command-line interface for quick practice\n\n### \ud83d\udd17 Links\n- **GitHub**: https://github.com/1036007003-wq/exam-ai\n- **Live Demo**: https://1036007003-wq.github.io/exam-ai/\n- **Documentation**: https://github.com/1036007003-wq/exam-ai#readme\n\n### \ud83d\udee0\ufe0f Tech Stack\n- **Backend**: Flask, Python 3.8+\n- **AI**: Ollama (qwen2.5:3b, llama3)\n- **Frontend**: HTML5, CSS3, JavaScript\n- **Data**: JSON-based question storage\n\nWould love to get feedback from the Flask community! \ud83d\ude80",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6059"
+  },
+  {
+    "id": "GH-6057",
+    "number": 6057,
+    "title": "Dead Code Audit \u2014 65 potentially unused functions",
+    "body": "## Code Health Audit: Dead Code in Flask  **65 potentially unused functions** detected across the codebase.  ### Top files with dead code:  - **examples\\tutorial\\flaskr\\auth.py** (5): `login_required`\n`load_logged_in_user`\n`register`\n`login`\n`logout` - **examples\\tutorial\\tests\\conftest.py** (5): `app`\n`client`\n`runner`\n`auth`\n`login` - **examples\\tutorial\\tests\\test_auth.py** (5): `test_register`\n`test_register_validate_input`\n`test_login`\n`test_login_validate_input`\n`test_logout` - **examples\\tutorial\\tests\\test_blog.py** (5): `test_index`\n`test_login_required`\n`test_author_required`\n`test_exists_required`\n`test_create` - **src\\flask\\app.py** (5): `wrapper`\n`wrapper`\n`get_send_file_max_age`\n`send_static_file`\n`open_resource` - **src\\flask\\cli.py** (5): `get_version`\n`run_command`\n`shell_command`\n`routes_command`\n`load_app` - **src\\flask\\config.py** (5): `from_envvar`\n`from_prefixed_env`\n`from_pyfile`\n`from_object`\n`from_file` - **src\\flask\\ctx.py** (5): `after_this_request`\n`copy_cur",
+    "labels": [],
+    "file_references": [
+      "app.py",
+      "test_auth.py",
+      "helpers.py",
+      "cli.py",
+      "sessions.py",
+      "templating.py",
+      "auth.py",
+      "views.py",
+      "conftest.py",
+      "config.py",
+      "ctx.py",
+      "test_blog.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6057"
+  },
+  {
+    "id": "GH-6056",
+    "number": 6056,
+    "title": "Dependency Audit \u2014 check for outdated packages",
+    "body": "## Dependency Health Check\n\nAutomated audit by [Dep Auditor](https://github.com/shunfeng8421/dep-auditor).\n\n### Packages Found (requirements.txt)\n\n- **amqp** v5.3.1 (last release: 2024-11-12)\n- **async-timeout** v5.0.1 (last release: 2024-11-06)\n- **billiard** v4.2.4 (last release: 2025-11-30)\n- **blinker** v1.9.0 (last release: 2024-11-08)\n- **celery** v5.6.3 (last release: 2026-03-26)\n\n### Recommended Actions\n1. Check if any package has been abandoned (no releases in 2+ years)\n2. Consider replacing abandoned packages with maintained alternatives\n3. Run Package                                  Version   Latest   Type\n---------------------------------------- --------- -------- -----\naiofiles                                 24.1.0    25.1.0   wheel\naiohttp                                  3.13.5    3.14.1   wheel\nalibabacloud-credentials                 1.0.8     1.0.9    wheel\nalibabacloud-ecs20140526                 7.8.3     7.8.4    wheel\nanthropic                                0.1",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6056"
+  },
+  {
+    "id": "GH-6055",
+    "number": 6055,
+    "title": "Dependency Health Check",
+    "body": "Audited by Dep Auditor. Requirements.txt packages: amqp v5.3.1|async-timeout v5.0.1|billiard v4.2.4|blinker v1.9.0|celery v5.6.3",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6055"
+  },
+  {
+    "id": "GH-6054",
+    "number": 6054,
+    "title": "register_blueprint name override bypasses dot validation",
+    "body": "The `Blueprint` constructor explicitly prevents dots in names (`if \".\" in name: raise ValueError`) because dots denote nested blueprints. However, `app.register_blueprint(..., name=\"...\")` doesn't enforce this check on the overridden name.\n\nIf a blueprint is registered with a dot via the `name` kwarg, it bypasses the restriction. This tricks the framework into treating it as a nested blueprint, causing the parent's callbacks (like `before_request`) to unexpectedly execute for the unrelated child blueprint.\n\n### How to replicate the bug\n```python\nimport flask\n\napp = flask.Flask(__name__)\nparent = flask.Blueprint(\"parent\", __name__)\nchild = flask.Blueprint(\"child\", __name__)\n\nparent.before_request(lambda: setattr(flask.g, \"hit\", True))\nchild.add_url_rule(\"/\", \"index\", lambda: str(hasattr(flask.g, \"hit\")))\n\napp.register_blueprint(parent)\napp.register_blueprint(child, name=\"parent.fake\") # Bypasses dot validation\n\nprint(app.test_client().get(\"/\").get_data(as_text=True))",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6054"
+  },
+  {
+    "id": "GH-6051",
+    "number": 6051,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6051"
+  },
+  {
+    "id": "GH-6050",
+    "number": 6050,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6050"
+  },
+  {
+    "id": "GH-6049",
+    "number": 6049,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6049"
+  },
+  {
+    "id": "GH-6048",
+    "number": 6048,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6048"
+  },
+  {
+    "id": "GH-6047",
+    "number": 6047,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6047"
+  },
+  {
+    "id": "GH-6044",
+    "number": 6044,
+    "title": "multiple teardown errors are discarded on Python < 3.11",
+    "body": "Markdown\nOn Python versions prior to 3.11, `_CollectErrors.raise_any()` (in `src/flask/helpers.py`, line 682) only re-raises the very first collected error, silently swallowing any subsequent teardown errors. This makes debugging secondary teardown failures impossible on Python < 3.11.\n\n### How to replicate the bug\n1. Create a `_CollectErrors` context manager.\n2. Trigger multiple teardown exceptions (e.g., DB close fails, then Cache flush fails).\n3. Call `raise_any()`. Only the first exception is raised; the others are silently lost.\n\n**Minimal Reproducible Example:**\n```python\nimport sys\n\nclass _CollectErrors:\n    def __init__(self):\n        self.errors = []\n\n    def __enter__(self):\n        pass\n\n    def __exit__(self, exc_type, exc_val, exc_tb):\n        if exc_val is not None:\n            self.errors.append(exc_val)\n        return True\n\n    def raise_any(self, message: str) -> None:\n        if self.errors:\n            if sys.version_info >= (3, 11):\n                raise BaseExcepti",
+    "labels": [],
+    "file_references": [
+      "src/flask/helpers.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6044"
+  },
+  {
+    "id": "GH-6042",
+    "number": 6042,
+    "title": "AI spam",
+    "body": "spam",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6042"
+  },
+  {
+    "id": "GH-6031",
+    "number": 6031,
+    "title": "API doc references are not sorted",
+    "body": "Method and properties in API docs are not following any sorting rules, making it hard to find specific references.\n\nhttps://flask.palletsprojects.com/en/stable/api/#flask.Request\n\n<img width=\"245\" height=\"369\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/29390e00-5264-443d-ad4b-41e9f162e128\" />\n\nI failed to find `endpoint` located between top `max_form_parts` and bottom `blueprint`.\n\nExpected alphabetic order for all class attributes.",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6031"
+  },
+  {
+    "id": "GH-6025",
+    "number": 6025,
+    "title": "FLASK_DEBUG env variable no longer works as of click 8.4.0",
+    "body": "**Description of bug:**\n\nFLASK_DEBUG=1 was working previously to set flask's debug mode either in a .env/.flaskenv and using python-dotenv OR by manually setting with export FLASK_DEBUG=1. As of today, setting it by env variable no longer works. Flask will still use debug mode using the --debug flag. Downgrading click to 8.3.3 resolves the issue.\n\n**Replicate bug:**\n\n```\npython3 -m venv venv\n. venv/bin/activate\npip install flask\ncat << EOF > app.py\nfrom flask import Flask\napp = Flask(__name__)\n@app.route('/')\ndef index():\n    return 'hello world'\nEOF\nexport FLASK_DEBUG=1\nflask run\n```\n\n**This produces:**\n\nDebug mode: off\n\n```\npip install click==8.3.3\nflask run\n```\n\n**Then produces:**\n\nDebug mode: on\n\n**Environment:**\n\n- Python version: 3.12.3\n- Flask version: 3.1.3\n",
+    "labels": [],
+    "file_references": [
+      "app.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6025"
+  },
+  {
+    "id": "GH-6023",
+    "number": 6023,
+    "title": "Config.from_file() silently ignores fewer OSError codes than from_pyfile()",
+    "body": "## Summary\n\n`Config.from_file()` and `Config.from_pyfile()` behave inconsistently when `silent=True` and an `OSError` is raised.\n\n`from_pyfile()` silences errors for these `errno` codes:\n\n```python\nif silent and e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):\n    return False\n```\n\nBut `from_file()` only silences:\n\n```python\nif silent and e.errno in (errno.ENOENT, errno.EISDIR):\n    return False\n```\n\nIt is missing `errno.ENOTDIR`.\n\n## Reproduction\n\n`ENOTDIR` is raised when a path component is a regular file, not a directory. For example, if `/tmp/myconfig` is a regular file and you try to open `/tmp/myconfig/settings.json`, the OS raises `ENOTDIR` (not a directory).\n\n```python\nimport os, tempfile\nfrom flask import Flask\n\napp = Flask(__name__)\n\n# create a file where we expect a directory\nwith tempfile.NamedTemporaryFile(delete=False, suffix=\"cfg\") as f:\n    f.write(b\"\")\n    tmp = f.name\n\n# from_pyfile with silent=True returns False (correct)\nresult = app.config.from_pyfile(tmp + ",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6023"
+  },
+  {
+    "id": "GH-6059",
+    "number": 6059,
+    "title": "AI spam",
+    "body": "## \ud83c\udf93 Project Showcase\n\nI built **Exam AI** - an intelligent exam preparation assistant using Flask for the web interface and Ollama for local LLM integration.\n\n### \u2728 Features\n- \ud83c\udf10 **Flask Web UI** - Clean, responsive interface for exam practice\n- \ud83e\udd16 **Ollama Integration** - Local LLM for AI-powered explanations\n- \ud83d\udcdd **Question Bank** - Manage questions by exam type and subject\n- \u274c **Wrong Question Tracker** - Automatic tracking with spaced repetition\n- \ud83d\udcca **Statistics Dashboard** - Visual progress tracking\n- \ud83d\udcbb **CLI Tool** - Command-line interface for quick practice\n\n### \ud83d\udd17 Links\n- **GitHub**: https://github.com/1036007003-wq/exam-ai\n- **Live Demo**: https://1036007003-wq.github.io/exam-ai/\n- **Documentation**: https://github.com/1036007003-wq/exam-ai#readme\n\n### \ud83d\udee0\ufe0f Tech Stack\n- **Backend**: Flask, Python 3.8+\n- **AI**: Ollama (qwen2.5:3b, llama3)\n- **Frontend**: HTML5, CSS3, JavaScript\n- **Data**: JSON-based question storage\n\nWould love to get feedback from the Flask community! \ud83d\ude80",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6059"
+  },
+  {
+    "id": "GH-6057",
+    "number": 6057,
+    "title": "Dead Code Audit \u2014 65 potentially unused functions",
+    "body": "## Code Health Audit: Dead Code in Flask  **65 potentially unused functions** detected across the codebase.  ### Top files with dead code:  - **examples\\tutorial\\flaskr\\auth.py** (5): `login_required`\n`load_logged_in_user`\n`register`\n`login`\n`logout` - **examples\\tutorial\\tests\\conftest.py** (5): `app`\n`client`\n`runner`\n`auth`\n`login` - **examples\\tutorial\\tests\\test_auth.py** (5): `test_register`\n`test_register_validate_input`\n`test_login`\n`test_login_validate_input`\n`test_logout` - **examples\\tutorial\\tests\\test_blog.py** (5): `test_index`\n`test_login_required`\n`test_author_required`\n`test_exists_required`\n`test_create` - **src\\flask\\app.py** (5): `wrapper`\n`wrapper`\n`get_send_file_max_age`\n`send_static_file`\n`open_resource` - **src\\flask\\cli.py** (5): `get_version`\n`run_command`\n`shell_command`\n`routes_command`\n`load_app` - **src\\flask\\config.py** (5): `from_envvar`\n`from_prefixed_env`\n`from_pyfile`\n`from_object`\n`from_file` - **src\\flask\\ctx.py** (5): `after_this_request`\n`copy_cur",
+    "labels": [],
+    "file_references": [
+      "app.py",
+      "test_auth.py",
+      "helpers.py",
+      "cli.py",
+      "sessions.py",
+      "templating.py",
+      "auth.py",
+      "views.py",
+      "conftest.py",
+      "config.py",
+      "ctx.py",
+      "test_blog.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6057"
+  },
+  {
+    "id": "GH-6056",
+    "number": 6056,
+    "title": "Dependency Audit \u2014 check for outdated packages",
+    "body": "## Dependency Health Check\n\nAutomated audit by [Dep Auditor](https://github.com/shunfeng8421/dep-auditor).\n\n### Packages Found (requirements.txt)\n\n- **amqp** v5.3.1 (last release: 2024-11-12)\n- **async-timeout** v5.0.1 (last release: 2024-11-06)\n- **billiard** v4.2.4 (last release: 2025-11-30)\n- **blinker** v1.9.0 (last release: 2024-11-08)\n- **celery** v5.6.3 (last release: 2026-03-26)\n\n### Recommended Actions\n1. Check if any package has been abandoned (no releases in 2+ years)\n2. Consider replacing abandoned packages with maintained alternatives\n3. Run Package                                  Version   Latest   Type\n---------------------------------------- --------- -------- -----\naiofiles                                 24.1.0    25.1.0   wheel\naiohttp                                  3.13.5    3.14.1   wheel\nalibabacloud-credentials                 1.0.8     1.0.9    wheel\nalibabacloud-ecs20140526                 7.8.3     7.8.4    wheel\nanthropic                                0.1",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6056"
+  },
+  {
+    "id": "GH-6055",
+    "number": 6055,
+    "title": "Dependency Health Check",
+    "body": "Audited by Dep Auditor. Requirements.txt packages: amqp v5.3.1|async-timeout v5.0.1|billiard v4.2.4|blinker v1.9.0|celery v5.6.3",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6055"
+  },
+  {
+    "id": "GH-6054",
+    "number": 6054,
+    "title": "register_blueprint name override bypasses dot validation",
+    "body": "The `Blueprint` constructor explicitly prevents dots in names (`if \".\" in name: raise ValueError`) because dots denote nested blueprints. However, `app.register_blueprint(..., name=\"...\")` doesn't enforce this check on the overridden name.\n\nIf a blueprint is registered with a dot via the `name` kwarg, it bypasses the restriction. This tricks the framework into treating it as a nested blueprint, causing the parent's callbacks (like `before_request`) to unexpectedly execute for the unrelated child blueprint.\n\n### How to replicate the bug\n```python\nimport flask\n\napp = flask.Flask(__name__)\nparent = flask.Blueprint(\"parent\", __name__)\nchild = flask.Blueprint(\"child\", __name__)\n\nparent.before_request(lambda: setattr(flask.g, \"hit\", True))\nchild.add_url_rule(\"/\", \"index\", lambda: str(hasattr(flask.g, \"hit\")))\n\napp.register_blueprint(parent)\napp.register_blueprint(child, name=\"parent.fake\") # Bypasses dot validation\n\nprint(app.test_client().get(\"/\").get_data(as_text=True))",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6054"
+  },
+  {
+    "id": "GH-6051",
+    "number": 6051,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6051"
+  },
+  {
+    "id": "GH-6050",
+    "number": 6050,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6050"
+  },
+  {
+    "id": "GH-6049",
+    "number": 6049,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6049"
+  },
+  {
+    "id": "GH-6048",
+    "number": 6048,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6048"
+  },
+  {
+    "id": "GH-6047",
+    "number": 6047,
+    "title": "AI Junk",
+    "body": "LLM junk removed",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6047"
+  },
+  {
+    "id": "GH-6044",
+    "number": 6044,
+    "title": "multiple teardown errors are discarded on Python < 3.11",
+    "body": "Markdown\nOn Python versions prior to 3.11, `_CollectErrors.raise_any()` (in `src/flask/helpers.py`, line 682) only re-raises the very first collected error, silently swallowing any subsequent teardown errors. This makes debugging secondary teardown failures impossible on Python < 3.11.\n\n### How to replicate the bug\n1. Create a `_CollectErrors` context manager.\n2. Trigger multiple teardown exceptions (e.g., DB close fails, then Cache flush fails).\n3. Call `raise_any()`. Only the first exception is raised; the others are silently lost.\n\n**Minimal Reproducible Example:**\n```python\nimport sys\n\nclass _CollectErrors:\n    def __init__(self):\n        self.errors = []\n\n    def __enter__(self):\n        pass\n\n    def __exit__(self, exc_type, exc_val, exc_tb):\n        if exc_val is not None:\n            self.errors.append(exc_val)\n        return True\n\n    def raise_any(self, message: str) -> None:\n        if self.errors:\n            if sys.version_info >= (3, 11):\n                raise BaseExcepti",
+    "labels": [],
+    "file_references": [
+      "src/flask/helpers.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6044"
+  },
+  {
+    "id": "GH-6042",
+    "number": 6042,
+    "title": "AI spam",
+    "body": "spam",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6042"
+  },
+  {
+    "id": "GH-6031",
+    "number": 6031,
+    "title": "API doc references are not sorted",
+    "body": "Method and properties in API docs are not following any sorting rules, making it hard to find specific references.\n\nhttps://flask.palletsprojects.com/en/stable/api/#flask.Request\n\n<img width=\"245\" height=\"369\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/29390e00-5264-443d-ad4b-41e9f162e128\" />\n\nI failed to find `endpoint` located between top `max_form_parts` and bottom `blueprint`.\n\nExpected alphabetic order for all class attributes.",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6031"
+  },
+  {
+    "id": "GH-6025",
+    "number": 6025,
+    "title": "FLASK_DEBUG env variable no longer works as of click 8.4.0",
+    "body": "**Description of bug:**\n\nFLASK_DEBUG=1 was working previously to set flask's debug mode either in a .env/.flaskenv and using python-dotenv OR by manually setting with export FLASK_DEBUG=1. As of today, setting it by env variable no longer works. Flask will still use debug mode using the --debug flag. Downgrading click to 8.3.3 resolves the issue.\n\n**Replicate bug:**\n\n```\npython3 -m venv venv\n. venv/bin/activate\npip install flask\ncat << EOF > app.py\nfrom flask import Flask\napp = Flask(__name__)\n@app.route('/')\ndef index():\n    return 'hello world'\nEOF\nexport FLASK_DEBUG=1\nflask run\n```\n\n**This produces:**\n\nDebug mode: off\n\n```\npip install click==8.3.3\nflask run\n```\n\n**Then produces:**\n\nDebug mode: on\n\n**Environment:**\n\n- Python version: 3.12.3\n- Flask version: 3.1.3\n",
+    "labels": [],
+    "file_references": [
+      "app.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6025"
+  },
+  {
+    "id": "GH-6023",
+    "number": 6023,
+    "title": "Config.from_file() silently ignores fewer OSError codes than from_pyfile()",
+    "body": "## Summary\n\n`Config.from_file()` and `Config.from_pyfile()` behave inconsistently when `silent=True` and an `OSError` is raised.\n\n`from_pyfile()` silences errors for these `errno` codes:\n\n```python\nif silent and e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):\n    return False\n```\n\nBut `from_file()` only silences:\n\n```python\nif silent and e.errno in (errno.ENOENT, errno.EISDIR):\n    return False\n```\n\nIt is missing `errno.ENOTDIR`.\n\n## Reproduction\n\n`ENOTDIR` is raised when a path component is a regular file, not a directory. For example, if `/tmp/myconfig` is a regular file and you try to open `/tmp/myconfig/settings.json`, the OS raises `ENOTDIR` (not a directory).\n\n```python\nimport os, tempfile\nfrom flask import Flask\n\napp = Flask(__name__)\n\n# create a file where we expect a directory\nwith tempfile.NamedTemporaryFile(delete=False, suffix=\"cfg\") as f:\n    f.write(b\"\")\n    tmp = f.name\n\n# from_pyfile with silent=True returns False (correct)\nresult = app.config.from_pyfile(tmp + ",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6023"
+  },
+  {
+    "id": "GH-6065",
+    "number": 6065,
+    "title": "Add a query() route shortcut and MethodView support for HTTP QUERY (RFC 10008)",
+    "body": "The HTTP `QUERY` method was standardized in\n[RFC 10008](https://www.rfc-editor.org/info/rfc10008/) (June 2026): a safe,\nidempotent request method that carries content in the request body (the\nstandardized replacement for the \"use POST for a read-only query with a large\nbody\" workaround in GraphQL / REST search APIs).\n\nI'd like Flask to treat `QUERY` as a first-class method like the others:\n\n- a `query()` route shortcut on `Scaffold` (inherited by `Flask` and\n  `Blueprint`), mirroring `get`/`post`/`put`/`delete`/`patch`;\n- `MethodView` dispatch of `QUERY` to a `query` handler (add `\"query\"` to\n  `views.http_method_funcs`).\n\n---\n\nIs this solvable without changes to Flask? Partly \u2014 `@app.route(\"/x\",\nmethods=[\"QUERY\"])` already works today, since Flask doesn't restrict method\nnames and Werkzeug parses the body. What's missing is the ergonomic shortcut and\n`MethodView` dispatch that every other common method already has, so this is a\nconsistency/ergonomics gap rather than new capability \u2014 t",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6065"
+  },
+  {
+    "id": "GH-6059",
+    "number": 6059,
+    "title": "AI spam",
+    "body": "## \ud83c\udf93 Project Showcase\n\nI built **Exam AI** - an intelligent exam preparation assistant using Flask for the web interface and Ollama for local LLM integration.\n\n### \u2728 Features\n- \ud83c\udf10 **Flask Web UI** - Clean, responsive interface for exam practice\n- \ud83e\udd16 **Ollama Integration** - Local LLM for AI-powered explanations\n- \ud83d\udcdd **Question Bank** - Manage questions by exam type and subject\n- \u274c **Wrong Question Tracker** - Automatic tracking with spaced repetition\n- \ud83d\udcca **Statistics Dashboard** - Visual progress tracking\n- \ud83d\udcbb **CLI Tool** - Command-line interface for quick practice\n\n### \ud83d\udd17 Links\n- **GitHub**: https://github.com/1036007003-wq/exam-ai\n- **Live Demo**: https://1036007003-wq.github.io/exam-ai/\n- **Documentation**: https://github.com/1036007003-wq/exam-ai#readme\n\n### \ud83d\udee0\ufe0f Tech Stack\n- **Backend**: Flask, Python 3.8+\n- **AI**: Ollama (qwen2.5:3b, llama3)\n- **Frontend**: HTML5, CSS3, JavaScript\n- **Data**: JSON-based question storage\n\nWould love to get feedback from the Flask community! \ud83d\ude80",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6059"
+  },
+  {
+    "id": "GH-6057",
+    "number": 6057,
+    "title": "Dead Code Audit \u2014 65 potentially unused functions",
+    "body": "## Code Health Audit: Dead Code in Flask  **65 potentially unused functions** detected across the codebase.  ### Top files with dead code:  - **examples\\tutorial\\flaskr\\auth.py** (5): `login_required`\n`load_logged_in_user`\n`register`\n`login`\n`logout` - **examples\\tutorial\\tests\\conftest.py** (5): `app`\n`client`\n`runner`\n`auth`\n`login` - **examples\\tutorial\\tests\\test_auth.py** (5): `test_register`\n`test_register_validate_input`\n`test_login`\n`test_login_validate_input`\n`test_logout` - **examples\\tutorial\\tests\\test_blog.py** (5): `test_index`\n`test_login_required`\n`test_author_required`\n`test_exists_required`\n`test_create` - **src\\flask\\app.py** (5): `wrapper`\n`wrapper`\n`get_send_file_max_age`\n`send_static_file`\n`open_resource` - **src\\flask\\cli.py** (5): `get_version`\n`run_command`\n`shell_command`\n`routes_command`\n`load_app` - **src\\flask\\config.py** (5): `from_envvar`\n`from_prefixed_env`\n`from_pyfile`\n`from_object`\n`from_file` - **src\\flask\\ctx.py** (5): `after_this_request`\n`copy_cur",
+    "labels": [],
+    "file_references": [
+      "app.py",
+      "test_auth.py",
+      "helpers.py",
+      "cli.py",
+      "sessions.py",
+      "templating.py",
+      "auth.py",
+      "views.py",
+      "conftest.py",
+      "config.py",
+      "ctx.py",
+      "test_blog.py"
+    ],
+    "html_url": "https://github.com/pallets/flask/issues/6057"
+  },
+  {
+    "id": "GH-6056",
+    "number": 6056,
+    "title": "Dependency Audit \u2014 check for outdated packages",
+    "body": "## Dependency Health Check\n\nAutomated audit by [Dep Auditor](https://github.com/shunfeng8421/dep-auditor).\n\n### Packages Found (requirements.txt)\n\n- **amqp** v5.3.1 (last release: 2024-11-12)\n- **async-timeout** v5.0.1 (last release: 2024-11-06)\n- **billiard** v4.2.4 (last release: 2025-11-30)\n- **blinker** v1.9.0 (last release: 2024-11-08)\n- **celery** v5.6.3 (last release: 2026-03-26)\n\n### Recommended Actions\n1. Check if any package has been abandoned (no releases in 2+ years)\n2. Consider replacing abandoned packages with maintained alternatives\n3. Run Package                                  Version   Latest   Type\n---------------------------------------- --------- -------- -----\naiofiles                                 24.1.0    25.1.0   wheel\naiohttp                                  3.13.5    3.14.1   wheel\nalibabacloud-credentials                 1.0.8     1.0.9    wheel\nalibabacloud-ecs20140526                 7.8.3     7.8.4    wheel\nanthropic                                0.1",
+    "labels": [],
+    "file_references": [],
+    "html_url": "https://github.com/pallets/flask/issues/6056"
+  }
+]
