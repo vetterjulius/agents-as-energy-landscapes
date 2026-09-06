@@ -24,3 +24,4 @@ sympy==1.14.0
 torch==2.13.0+cpu
 typing_extensions==4.16.0
 colorlog==6.9.0
+python-dotenv==1.0.0
