@@ -170,6 +170,62 @@ def conflict_rate(problem, X):
     return constraint_violations(problem, X)
 
 
+# --- Real-World LLM Cost & Token Interpretation (GPT-4o Calibration) ---
+
+# Pricing: GPT-4o ($2.50 / 1M Input Tokens, $10.00 / 1M Output Tokens)
+# Assuming typical prompt/response ratio of 3:1 input:output -> Weighted avg: $4.375 / 1M tokens ($0.000004375 / token)
+GPT4O_COST_PER_TOKEN = 0.000004375
+
+def estimate_llm_cost_and_tokens(
+    problem,
+    X,
+    avg_task_tokens: int = 3000,
+    avg_msg_tokens: int = 800,
+    retry_factor: float = 1.5
+):
+    """
+    Translates an orchestration state X and problem instance into realistic estimated
+    GPT-4o LLM token usage and USD costs.
+    
+    - Base execution: M tasks * avg_task_tokens
+    - Inter-agent comms: communication_cost * avg_msg_tokens (for unaligned synergy links)
+    - Risk retry overhead: risk_energy * retry_factor * avg_task_tokens
+    """
+    M = len(problem.tasks)
+    
+    # 1. Base prompt & context tokens for task execution
+    base_tokens = M * avg_task_tokens
+    
+    # 2. Inter-agent communication tokens (synergy links assigned to different agents)
+    comm_links = communication_cost(problem, X)
+    comm_tokens = comm_links * avg_msg_tokens
+    
+    # 3. Risk-induced retry overhead tokens
+    # Compute normalized risk energy for state X
+    r_pred = RiskPredictor(problem.agents[0].capability_embedding.shape[0], W_risk=problem.risk_weights)
+    s = torch.stack([a.capability_embedding for a in problem.agents])
+    c = torch.stack([t.embedding for t in problem.tasks])
+    k = torch.zeros_like(s)
+    N = len(problem.agents)
+    state_temp = OrchestrationState(X=X, s=s, c=c, kappa=k, Theta=problem.interaction_graph, C=problem.co_assignment_costs, N=N, M=M, d=s.shape[1])
+    r_energy = RiskEnergy(r_pred).compute(state_temp).item()
+    
+    # Clamp risk energy to positive bounds for token estimation
+    risk_tokens = max(0.0, r_energy) * M * avg_task_tokens * retry_factor
+    
+    total_tokens = base_tokens + comm_tokens + risk_tokens
+    estimated_usd = total_tokens * GPT4O_COST_PER_TOKEN
+    
+    return {
+        "total_tokens": int(total_tokens),
+        "base_tokens": int(base_tokens),
+        "comm_tokens": int(comm_tokens),
+        "risk_tokens": int(risk_tokens),
+        "estimated_usd": round(estimated_usd, 4)
+    }
+
+
+
 # --- Statistical Significance Helper ---
 
 def compute_statistical_tests(ref_energies, baseline_energies):
