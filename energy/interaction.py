@@ -15,6 +15,5 @@ class InteractionEnergy(EnergyTerm):
 
         total_sum = (term_matrix * upper_tri_mask).sum()
 
-        # Normalize by M² since interaction matrix is [M, M]
-        # Upper triangular has M*(M-1)/2 elements, but we normalize by M² for consistency
-        return -total_sum / (state.M * state.M)
+        # Normalize by N * M for scale-invariance across agents and tasks
+        return -total_sum / (state.N * state.M)
