@@ -18,25 +18,31 @@ class RealGitHubScenario(Scenario):
             self.data = json.load(f)
 
     def generate(self, seed: int) -> ProblemInstance:
-        # Load agents
+        torch.manual_seed(seed)
+
+        # Load agents with seed-based capability noise (simulating daily performance variation)
         agents = []
         for a_data in self.data["agents"]:
+            base_cap = torch.tensor(a_data["capability_embedding"], dtype=torch.float32)
+            noise = torch.randn_like(base_cap) * 0.03
             agents.append(
                 Agent(
                     id=a_data["id"],
                     role=a_data["role"],
-                    capability_embedding=torch.tensor(a_data["capability_embedding"], dtype=torch.float32),
+                    capability_embedding=base_cap + noise,
                     tags=a_data.get("tags", [])
                 )
             )
 
-        # Load tasks
+        # Load tasks with seed-based issue complexity noise
         tasks = []
         for t_data in self.data["tasks"]:
+            base_emb = torch.tensor(t_data["embedding"], dtype=torch.float32)
+            noise = torch.randn_like(base_emb) * 0.03
             tasks.append(
                 Task(
                     id=t_data["id"],
-                    embedding=torch.tensor(t_data["embedding"], dtype=torch.float32),
+                    embedding=base_emb + noise,
                     tags=t_data.get("labels", [])
                 )
             )
@@ -53,3 +59,4 @@ class RealGitHubScenario(Scenario):
             co_assignment_costs=C,
             risk_weights=W_risk
         )
+
