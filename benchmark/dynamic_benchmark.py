@@ -25,7 +25,7 @@ logger = get_logger("dynamic_benchmark")
 def generate_capability_drift_episode(episode, seed=42):
     """
     Agent expertise changes abruptly at episode 25.
-    Tests kappa memory adaptation.
+    Evaluates the effect of kappa memory under capability drift.
     """
     torch.manual_seed(seed + episode)
     random.seed(seed + episode)
@@ -78,7 +78,7 @@ def generate_capability_drift_episode(episode, seed=42):
 def generate_task_shift_episode(episode, seed=42):
     """
     Task distribution shifts abruptly at episode 25.
-    Tests landscape embedding adaptation.
+    Evaluates assignment behavior after a task-embedding shift.
     """
     torch.manual_seed(seed + episode)
     random.seed(seed + episode)
@@ -127,7 +127,7 @@ def generate_task_shift_episode(episode, seed=42):
 def generate_dependency_change_episode(episode, seed=42):
     """
     Task dependencies (Theta) evolve/change at episode 25.
-    Tests structural adaptation.
+    Evaluates assignment behavior after a dependency-structure change.
     """
     torch.manual_seed(seed + episode)
     random.seed(seed + episode)
@@ -790,8 +790,8 @@ def plot_dynamic_results(all_trajectories, df_metrics, output_dir="results/plots
 # ----------------------------------------------------------------------
 
 def generate_dynamic_report_section(df_metrics):
-    dyn_section = "\n\n## Scientific Evaluation of Dynamic Landscape Adaptation (EBMAO)\n\n"
-    dyn_section += "Unlike static optimization baselines, the core contribution of EBMAO is its **adaptive energy landscape** powered by dual-timescale learning (dynamic memory $\\kappa$ and running co-assignment $\\Theta$). Below, we report the exact scientific metrics comparing the static energy system with EBMAO and its ablated variants in non-stationary and long-horizon scenarios.\n\n"
+    dyn_section = "\n\n## Dynamic Landscape Adaptation Results\n\n"
+    dyn_section += "This section reports the benchmark metrics for the static configuration, the two single-mechanism ablations, and the combined adaptive configuration in non-stationary and long-horizon scenarios.\n\n"
 
     # Define scenarios and descriptions
     scenarios_info = {
@@ -869,40 +869,40 @@ def generate_dynamic_report_section(df_metrics):
             drop = sub["perf_drop"].mean()
             dyn_section += f"| {cfg} | {rec:.2f} | {reg:.2f} | {stab:.4f} | {conv:.4f} | {drop:.4f} |\n"
 
-    dyn_section += "\n### Scientific Analysis & Discussion\n"
-    dyn_section += "- **The Power of Adaptive Landscape**: Static energy optimization has no memory and no structural learning. When agent expertise drifts or task distributions shift, it suffers massive energy spikes and takes extremely long to re-converge, incurring high cumulative regret. In contrast, **Full EBMAO achieves the fastest recovery times** and slashes cumulative regret by more than 70%.\n"
-    dyn_section += "- **Ablation Insights**: Kappa memory updates are critical for capability drift and robustness, while Theta structural updates are essential for changing task dependencies. Only when both are active (**Full EBMAO**) does the system obtain total robustness across all forms of non-stationarity.\n"
-    dyn_section += "- **Emergent Specialization**: Over long-horizon 80 cycles, EBMAO actively reshapes its landscape to create distinct agent roles (emergent specialization), aligning agents to task families naturally and reducing task-agent clustering costs significantly over time compared to static baselines.\n\n"
+    dyn_section += "\n### Descriptive Analysis\n"
+    dyn_section += "- The table reports recovery time, cumulative regret, reconfiguration cost, convergence, and immediate performance drop for each configuration. Differences should be interpreted together with the number of seeds and the recovery definition.\n"
+    dyn_section += "- The kappa-only and theta-only configurations isolate the two adaptive mechanisms; this is an ablation design, not a claim that either mechanism is universally necessary.\n"
+    dyn_section += "- The long-horizon specialization trace reports the assignment-based cosine-similarity metric defined by the benchmark. It does not by itself establish learned agent roles.\n\n"
 
     return dyn_section
 
 def generate_dynamic_catalog_section():
     cat_section = "## 7. Dynamic Adaptation & Long-Horizon Learning\n\n"
-    cat_section += "These plots visually represent EBMAO's capability to reshape and learn the energy landscape over time.\n\n"
+    cat_section += "These plots visualize the benchmark trajectories and metrics collected over time.\n\n"
 
     cat_section += "### Dynamic Adaptation Learning Curves\n"
     cat_section += "![Dynamic Adaptation Curves](plots/dynamic_adaptation_curves.png)\n\n"
     cat_section += "**Interpretation**:\n"
     cat_section += "- **What this shows**: Landscape energy trajectories over 50 episodes under capability drift, task shift, and changing dependencies. Red dashed line marks the exact episode where the environment abruptly shifts.\n"
-    cat_section += "- **Analysis**: Full EBMAO (green curve) shows immediate recovery after perturbations, returning to near-optimal energy in 1-3 episodes. The Static Energy model (orange curve) fails to adapt, exhibiting a permanent performance penalty or high-energy state.\n\n"
+    cat_section += "- **Analysis**: The curves show the observed energy trajectories after the perturbation. Recovery claims require the quantitative metrics and uncertainty estimates rather than visual inspection alone.\n\n"
 
     cat_section += "### Emergent Role Specialization\n"
     cat_section += "![Emergent Specialization Curves](plots/dynamic_specialization_curves.png)\n\n"
     cat_section += "**Interpretation**:\n"
     cat_section += "- **What this shows**: Specialization degree (cosine similarity between assigned agents and tasks) over an 80-cycle horizon.\n"
-    cat_section += "- **Analysis**: Shows specialization emergence. Over time, EBMAO's adaptive memory updates guide agents to self-organize into specific roles, raising the specialization degree from ~0.25 to >0.75, while the static baseline remains completely flat.\n\n"
+    cat_section += "- **Analysis**: The plot shows the benchmark's specialization-degree metric over time. The metric is assignment-based and should not be interpreted as direct evidence of role learning without additional controls.\n\n"
 
     cat_section += "### Non-Stationary Robustness Profile\n"
     cat_section += "![Robustness Profile](plots/dynamic_robustness_curves.png)\n\n"
     cat_section += "**Interpretation**:\n"
     cat_section += "- **What this shows**: System survival and energy recovery under compound perturbations (agent failure/degradation at ep 25, new agent joining at ep 38).\n"
-    cat_section += "- **Analysis**: Proves that EBMAO is highly resilient: it absorbs agent loss with a small, temporary energy increase and immediately integrates new agents into the optimal orchestration layout, whereas static models remain highly sub-optimal.\n\n"
+    cat_section += "- **Analysis**: The plot shows energy trajectories during the specified agent failure, degradation, and arrival events. Quantitative resilience claims require comparison across independent seeds and predefined uncertainty measures.\n\n"
 
     cat_section += "### Quantitative Adaptation Comparison\n"
     cat_section += "![Adaptation Speed and Regret](plots/dynamic_adaptation_bars.png)\n\n"
     cat_section += "**Interpretation**:\n"
     cat_section += "- **What this shows**: Average Recovery Time (episodes) and Cumulative Regret across all non-stationary scenarios.\n"
-    cat_section += "- **Analysis**: Full EBMAO reduces recovery time from >20 episodes to <3 episodes on average and cuts cumulative regret by over 70%, proving the extreme scientific benefits of active landscape learning.\n"
+    cat_section += "- **Analysis**: The bars summarize recovery time and cumulative regret as computed by the benchmark. Lower values indicate lower measured adaptation cost under the chosen definitions.\n"
 
     return cat_section
 
@@ -917,14 +917,14 @@ def update_benchmark_reports(df_metrics, report_path="results/benchmark_report.m
 
         # Update TOC in report
         toc_old = "3. [Statistical Significance & Confidence Intervals](#statistical-significance--confidence-intervals)\n4. [Link to Detailed Figure Catalog](#detailed-figure-catalog)"
-        toc_new = "3. [Statistical Significance & Confidence Intervals](#statistical-significance--confidence-intervals)\n4. [Scientific Evaluation of Dynamic Landscape Adaptation (EBMAO)](#scientific-evaluation-of-dynamic-landscape-adaptation-ebmao)\n5. [Link to Detailed Figure Catalog](#detailed-figure-catalog)"
+        toc_new = "3. [Statistical Significance & Confidence Intervals](#statistical-significance--confidence-intervals)\n4. [Dynamic Landscape Adaptation Results](#dynamic-landscape-adaptation-results)\n5. [Link to Detailed Figure Catalog](#detailed-figure-catalog)"
         if toc_old in content:
             content = content.replace(toc_old, toc_new)
 
         # Locate where to insert/replace
-        if "## Scientific Evaluation of Dynamic Landscape Adaptation" in content:
+        if "## Dynamic Landscape Adaptation Results" in content:
             # We want to replace from this header up to "## Detailed Figure Catalog"
-            parts = content.split("## Scientific Evaluation of Dynamic Landscape Adaptation")
+            parts = content.split("## Dynamic Landscape Adaptation Results")
             header_and_before = parts[0]
             after_dyn = parts[1].split("## Detailed Figure Catalog")
             if len(after_dyn) > 1:

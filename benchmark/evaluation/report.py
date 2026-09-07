@@ -72,7 +72,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
             f.write("Comparison of energy-based solvers against the baseline with lowest mean energy.\n\n")
 
             # Find best baseline
-            baselines = ["Random", "Capability Matching (Greedy)", "GreedyLB", "RuleBased", "Beam Search", "Tabu Search", "Market Auction (SOTA)"]
+            baselines = ["Random", "Capability Matching (Greedy)", "GreedyLB", "RuleBased", "Beam Search", "Tabu Search", "Market Auction"]
             best_base_name = None
             best_base_energy = float('inf')
 
@@ -221,7 +221,7 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
         
         if os.path.exists("results/plots/scaling_runtime.png"):
             f.write("![Scaling Runtime](plots/scaling_runtime.png)\n\n")
-            f.write("**Figure**: Computation time (seconds) as a function of problem size. Linear or sub-linear scaling indicates good computational efficiency.\n\n")
+            f.write("**Figure**: Computation time (seconds) as a function of problem size. The figure reports observed runtimes for the evaluated configurations.\n\n")
         
         if os.path.exists("results/plots/scaling_agents_energy.png"):
             f.write("### Agent Scaling\n")
@@ -285,22 +285,22 @@ def generate_markdown_report(all_results, output_path="results/benchmark_report.
         if os.path.exists("results/plots/dynamic_adaptation_curves.png"):
             f.write("### Adaptation Trajectories\n")
             f.write("![Dynamic Adaptation Curves](plots/dynamic_adaptation_curves.png)\n\n")
-            f.write("**Figure**: Energy trajectories over 50 episodes for three dynamic scenarios (Capability Drift, Task Shift, Dependency Change). Vertical red line indicates the abrupt perturbation at episode 25. Full EBMAO (green) demonstrates faster recovery and adaptation compared to static energy baseline (orange) and single-component ablations.\n\n")
+            f.write("**Figure**: Energy trajectories over 50 episodes for three dynamic scenarios (Capability Drift, Task Shift, Dependency Change). Vertical red line indicates the perturbation at episode 25.\n\n")
         
         if os.path.exists("results/plots/dynamic_specialization_curves.png"):
             f.write("### Emergent Specialization\n")
             f.write("![Specialization Evolution](plots/dynamic_specialization_curves.png)\n\n")
-            f.write("**Figure**: Evolution of agent role specialization degree over 80 episodes. Higher values indicate stronger task-type specialization. EBMAO's adaptive memory enables emergent specialization patterns.\n\n")
+            f.write("**Figure**: Evolution of the assignment-based specialization degree over 80 episodes. Higher values indicate greater cosine similarity between assigned agents and tasks.\n\n")
         
         if os.path.exists("results/plots/dynamic_robustness_curves.png"):
             f.write("### Robustness Under Perturbations\n")
             f.write("![Robustness Curves](plots/dynamic_robustness_curves.png)\n\n")
-            f.write("**Figure**: Energy evolution during agent failure (episode 25, red line) and new agent joining (episode 38, blue line). Tests system resilience and recovery capabilities.\n\n")
+            f.write("**Figure**: Energy evolution during agent failure (episode 25, red line) and new agent joining (episode 38, blue line).\n\n")
         
         if os.path.exists("results/plots/dynamic_adaptation_bars.png"):
             f.write("### Recovery Metrics\n")
             f.write("![Adaptation Metrics](plots/dynamic_adaptation_bars.png)\n\n")
-            f.write("**Figure**: Average recovery time (episodes to return to pre-perturbation performance) and cumulative regret (total adaptation loss) across dynamic scenarios. Lower values indicate faster, more efficient adaptation.\n\n")
+            f.write("**Figure**: Average recovery-time and cumulative-regret values reported by the dynamic benchmark. Lower values indicate lower values of the corresponding metric.\n\n")
         
         f.write("## 8. Optimization Trajectories\n\n")
         f.write("Detailed view of the optimization process dynamics.\n\n")

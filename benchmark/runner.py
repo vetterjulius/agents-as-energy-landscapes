@@ -307,7 +307,7 @@ def run_benchmark(quick: bool = False):
             ),
         ),
 
-        "Market Auction (SOTA)": MarketAuctionOrchestrator(
+        "Market Auction": MarketAuctionOrchestrator(
             alpha_load=0.5,
             beta_synergy=0.5,
         ),

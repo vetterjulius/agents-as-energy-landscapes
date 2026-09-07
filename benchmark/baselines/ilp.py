@@ -16,7 +16,8 @@ class ILPOrchestrator(Orchestrator):
       - Binary decision variables X[i, t] in {0, 1} for agent i, task t
       - Auxiliary binary variables Y[i, t, t'] in {0, 1} for co-assignment X[i, t] * X[i, t']
     
-    Guarantees finding the globally optimal assignment matrix X* (Ground Truth Optimum).
+    Provides an exact MILP formulation when the solver reaches an optimal status;
+    bounded runs may instead return a feasible incumbent or a solver limit result.
     """
     def __init__(self, energy_cfg=None, time_limit_sec=30.0):
         self.energy_cfg = energy_cfg or {}

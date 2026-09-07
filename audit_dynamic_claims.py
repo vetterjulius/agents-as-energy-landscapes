@@ -14,7 +14,7 @@ Output:
 """
 
 import os
-import glob
+import sys
 import numpy as np
 import pandas as pd
 
@@ -38,50 +38,69 @@ CONFIGS = {
 }
 
 PERTURB_EP = 25        # episode where drift / shift happens
-TOTAL_EPS  = 51        # 0..50
+RECOVERY_WINDOW = 3    # consecutive episodes required for stable recovery
 
 # ── Exact metric definitions (printed verbatim in the report) ─────────────────
 METRIC_DEFS = {
     "pre_energy_mean":
-        "Mean energy over episodes [0, 24] — stable pre-drift window.",
+        "Mean energy over the ten episodes immediately before the perturbation.",
     "post_energy_mean":
-        "Mean energy over episodes [25, 50] — post-drift window.",
+        "Mean energy from the perturbation episode through the last available episode.",
     "delta_energy":
         "post_energy_mean − pre_energy_mean  (positive = worse after drift).",
     "perf_drop":
         "Energy(episode 25) − Energy(episode 24).  Immediate shock size.",
     "recovery_time_abs":
-        "First episode t ≥ 25 such that Energy(t) ≤ 1.10 × post_energy_mean  "
+        "First episode t ≥ 25 whose next three energies are all ≤ 1.10 × "
+        "the relevant baseline  "
         "(for Robustness/Task Shift: target = post-drift stable level; "
-        "for Capability Drift / Dependency Change: target = 1.10 × pre_energy_mean). "
+        "for Capability Drift / Dependency Change: target = pre-drift level; "
+        "the 1.10× tolerance applies in both cases). "
         "Measured in episodes from perturbation point (lower = faster).",
     "cum_regret":
-        "Σ_{t=25}^{50} max(0, E_t − pre_energy_mean)  — total excess energy "
+        "Sum from the perturbation episode through the last available episode of "
+        "max(0, E_t − pre_energy_mean) — total excess energy "
         "accumulated after the drift relative to the pre-drift baseline.",
     "late_energy_mean":
-        "Mean energy over episodes [40, 50] — whether the system eventually "
+        "Mean energy over the last ten available episodes — whether the system eventually "
         "settles to a good solution.",
     "late_energy_std":
-        "Std of energy over episodes [40, 50] — stability of final state.",
+        "Std of energy over the last ten available episodes — stability of final state.",
 }
 
 
 def load_df(scenario_key, config_key):
-    pattern = os.path.join(RESULTS_DIR, f"{scenario_key}_{config_key}.csv")
-    files = glob.glob(pattern)
-    if not files:
+    path = os.path.join(RESULTS_DIR, f"{scenario_key}_{config_key}.csv")
+    if not os.path.exists(path):
         return None
-    return pd.read_csv(files[0])
+    return pd.read_csv(path)
 
 
 def compute_metrics(df, scenario_label):
     """Compute all metrics from a single-run episode DataFrame."""
-    eps   = df["episode"].values
-    E     = df["energy"].values
+    required_columns = {"episode", "energy"}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {sorted(missing_columns)}")
 
-    pre_mask  = (eps >= 0) & (eps < PERTURB_EP)
-    post_mask = (eps >= PERTURB_EP) & (eps < TOTAL_EPS)
-    late_mask = (eps >= 40) & (eps < TOTAL_EPS)
+    data = df.sort_values("episode").reset_index(drop=True)
+    eps = data["episode"].to_numpy()
+    E = data["energy"].to_numpy()
+
+    if len(eps) == 0 or not np.array_equal(eps, np.arange(eps[-1] + 1)):
+        raise ValueError("Episodes must be a contiguous sequence starting at 0")
+    total_eps = int(eps[-1]) + 1
+    if total_eps <= PERTURB_EP:
+        raise ValueError(
+            f"Need episodes after perturbation episode {PERTURB_EP}, got {total_eps}"
+        )
+
+    pre_mask = (
+        (eps >= max(0, PERTURB_EP - 10))
+        & (eps < PERTURB_EP)
+    )
+    post_mask = eps >= PERTURB_EP
+    late_mask = eps >= max(PERTURB_EP + 15, total_eps - 10)
 
     pre_mean  = E[pre_mask].mean()  if pre_mask.any()  else np.nan
     post_mean = E[post_mask].mean() if post_mask.any() else np.nan
@@ -89,31 +108,25 @@ def compute_metrics(df, scenario_label):
     late_std  = E[late_mask].std()  if late_mask.any() else np.nan
 
     # Immediate shock
-    ep24_idx = np.where(eps == PERTURB_EP - 1)[0]
-    ep25_idx = np.where(eps == PERTURB_EP)[0]
-    if len(ep24_idx) and len(ep25_idx):
-        perf_drop = float(E[ep25_idx[0]] - E[ep24_idx[0]])
-    else:
-        perf_drop = np.nan
+    perf_drop = float(E[PERTURB_EP] - E[PERTURB_EP - 1])
 
     # Recovery time with *two* target definitions:
     #   permanent-shift scenarios → recover to 1.10 × post_mean
     #   adaptive scenarios        → recover to 1.10 × pre_mean
     is_permanent = scenario_label in ("Task Shift", "Robustness")
     target = 1.10 * post_mean if is_permanent else 1.10 * pre_mean
-    recovery_time = TOTAL_EPS - PERTURB_EP  # default: never recovered
-    for t in range(PERTURB_EP, TOTAL_EPS):
-        idx = np.where(eps == t)[0]
-        if len(idx) and E[idx[0]] <= target:
+    recovery_time = total_eps - PERTURB_EP  # default: never recovered
+    last_start = total_eps - RECOVERY_WINDOW
+    for t in range(PERTURB_EP, last_start + 1):
+        window = E[t:t + RECOVERY_WINDOW]
+        if np.all(window <= target):
             recovery_time = t - PERTURB_EP
             break
 
     # Cumulative regret vs. pre-drift baseline
     cum_regret = 0.0
-    for t in range(PERTURB_EP, TOTAL_EPS):
-        idx = np.where(eps == t)[0]
-        if len(idx):
-            cum_regret += max(0.0, E[idx[0]] - pre_mean)
+    for value in E[PERTURB_EP:]:
+        cum_regret += max(0.0, value - pre_mean)
 
     return {
         "pre_energy_mean":  round(pre_mean,  4),
@@ -129,8 +142,6 @@ def compute_metrics(df, scenario_label):
 
 def main():
     rows = []
-    warnings = []
-
     for sc_label, sc_key in SCENARIOS.items():
         for cfg_key, cfg_label in CONFIGS.items():
             df = load_df(sc_key, cfg_key)
@@ -244,7 +255,7 @@ def main():
     report_lines.append("""
 [1] Robustness / Task Shift recovery_time:
     Target = 1.10 × post_drift_mean (not pre-drift mean).
-    This means 'recovery' is relative to the new, degraded level.
+    This means 'recovery' is settling relative to the new, degraded level.
     MUST be stated explicitly in paper: 'recovers to within 10% of
     post-perturbation steady state, not to pre-perturbation level.'
 
@@ -279,15 +290,23 @@ def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     df_out.to_csv(OUTPUT_CSV, index=False)
-    print(f"Saved audit table  → {OUTPUT_CSV}")
+    print(f"Saved audit table  -> {OUTPUT_CSV}")
 
     report_text = "\n".join(report_lines)
     with open(OUTPUT_TXT, "w", encoding="utf-8") as f:
         f.write(report_text)
-    print(f"Saved audit report → {OUTPUT_TXT}")
+    print(f"Saved audit report -> {OUTPUT_TXT}")
 
     # Print to console
-    print("\n" + report_text)
+    console_encoding = sys.stdout.encoding or "utf-8"
+    safe_report = report_text.encode(
+        console_encoding,
+        errors="replace",
+    ).decode(
+        console_encoding,
+        errors="replace",
+    )
+    print("\n" + safe_report)
 
 
 if __name__ == "__main__":
