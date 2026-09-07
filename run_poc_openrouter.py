@@ -1,5 +1,6 @@
 import os
 import torch
+import time
 from urllib import request
 import json
 from dotenv import load_dotenv
@@ -7,8 +8,8 @@ from dotenv import load_dotenv
 from benchmark.scenarios.base import ProblemInstance, Agent, Task
 from orchestrator.ebmao_orchestrator import EBMAOOrchestrator
 
-# Standard free model on OpenRouter: meta-llama/llama-3.2-1b-instruct:free or google/gemma-2-9b-it:free
-DEFAULT_FREE_MODEL = "meta-llama/llama-3.2-1b-instruct:free"
+# Standard free model on OpenRouter: openrouter/free (auto-router) or google/gemma-4-31b-it:free
+DEFAULT_FREE_MODEL = "minimax/minimax-m3:free"
 load_dotenv()  # Load environment variables from .env file
 
 def call_openrouter(prompt: str, model: str = DEFAULT_FREE_MODEL) -> str:
@@ -27,9 +28,13 @@ def call_openrouter(prompt: str, model: str = DEFAULT_FREE_MODEL) -> str:
     }
 
     req = request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers)
-    with request.urlopen(req) as resp:
-        res_data = json.loads(resp.read().decode("utf-8"))
-        return res_data["choices"][0]["message"]["content"]
+    try:
+        with request.urlopen(req) as resp:
+            res_data = json.loads(resp.read().decode("utf-8"))
+            return res_data["choices"][0]["message"]["content"]
+    except request.HTTPError as e:
+        error_detail = e.read().decode("utf-8") if e.fp else ""
+        raise RuntimeError(f"HTTP Error {e.code}: {e.reason}\nDetails: {error_detail}") from e
 
 
 def run_poc():
@@ -108,7 +113,8 @@ def run_poc():
             response = call_openrouter(prompt)
             print(f"Response:\n{response}")
         except Exception as e:
-            print(f"API Call failed (check OPENROUTER_API_KEY): {e}")
+            print(f"API Call failed: {e}")
+        time.sleep(1.5)
 
     print("\n" + "=" * 70)
     print("PoC Run Completed Successfully!")
