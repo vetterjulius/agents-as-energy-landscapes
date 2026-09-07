@@ -86,7 +86,11 @@ def run_representation_ablations(problem, cfg):
         orch = AblationOrchestrator(cfg, enabled_terms=terms)
         X = orch.solve(problem)
         from .evaluation.metrics import compute_energy
-        energy, _ = compute_energy(problem, X)
+        energy, _ = compute_energy(
+            problem,
+            X,
+            enabled_terms=terms,
+        )
         results[name] = energy
     return results
 

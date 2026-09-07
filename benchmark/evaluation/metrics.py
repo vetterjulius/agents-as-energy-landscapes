@@ -14,8 +14,15 @@ def compute_energy(
     energy_cfg=None,
     kappa=None,
     theta=None,
+    enabled_terms=None,
 ):
     energy_cfg = energy_cfg or {}
+
+    active_terms = (
+        {"assignment", "interaction", "cost", "risk"}
+        if enabled_terms is None
+        else set(enabled_terms)
+    )
 
     interaction_weight = energy_cfg.get("interaction_weight", 1.0)
     lambda_align = energy_cfg.get("lambda_align", 0.5)
@@ -46,32 +53,36 @@ def compute_energy(
 
     registry = EnergyRegistry()
 
-    registry.add(
-        AssignmentEnergy(
-            lambda_align=lambda_align,
-            lambda_memory=lambda_memory,
-            weight=1.0,
+    if "assignment" in active_terms:
+        registry.add(
+            AssignmentEnergy(
+                lambda_align=lambda_align,
+                lambda_memory=lambda_memory,
+                weight=1.0,
+            )
         )
-    )
 
-    registry.add(
-        InteractionEnergy(
-            weight=interaction_weight,
+    if "interaction" in active_terms:
+        registry.add(
+            InteractionEnergy(
+                weight=interaction_weight,
+            )
         )
-    )
 
-    registry.add(
-        CostEnergy(
-            weight=cost_weight,
+    if "cost" in active_terms:
+        registry.add(
+            CostEnergy(
+                weight=cost_weight,
+            )
         )
-    )
 
-    registry.add(
-        RiskEnergy(
-            risk_predictor,
-            weight=risk_weight,
+    if "risk" in active_terms:
+        registry.add(
+            RiskEnergy(
+                risk_predictor,
+                weight=risk_weight,
+            )
         )
-    )
 
     total, components = registry.compute(state)
 
