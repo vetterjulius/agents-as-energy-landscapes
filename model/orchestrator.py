@@ -14,8 +14,9 @@ from dynamics.memory_update import MemoryUpdater
 from dynamics.temperature import TemperatureController
 
 class Orchestrator:
-    def __init__(self, cfg, initial_state=None, W_risk=None):
+    def __init__(self, cfg, initial_state=None, W_risk=None, landscape=None):
         self.cfg = cfg
+        self.landscape = landscape
         m = cfg["model"]
 
         # dimensions
@@ -200,6 +201,8 @@ class Orchestrator:
             self.memory_updater.apply(self.state, self.risk_predictor)
 
     def total_energy(self):
+        if self.landscape is not None:
+            return float(self.landscape.evaluate(self.state.X))
         total, _ = self.energy_registry.compute(self.state)
         return total
 

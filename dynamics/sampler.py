@@ -6,14 +6,16 @@ class SimulatedAnnealingSampler:
     def __init__(
         self,
         proposal_mechanism,
-        energy_registry,
+        energy_registry=None,
         T_init=2.0,
         target_accept=0.3,
         num_candidates=4,
         mode="sa",
+        landscape=None,
     ):
         self.proposal_mechanism = proposal_mechanism
         self.energy_registry = energy_registry
+        self.landscape = landscape
 
         self.T = float(T_init)
         self.target_accept = float(target_accept)
@@ -31,10 +33,19 @@ class SimulatedAnnealingSampler:
 
         self.mode = mode
 
+    def evaluate_assignment(self, X, state=None):
+        if self.landscape is not None:
+            return float(self.landscape.evaluate(X))
+        if self.energy_registry is None:
+            raise ValueError("Either a landscape or energy_registry must be provided to evaluate X.")
+        if state is None:
+            raise ValueError("A state is required when evaluating through the energy registry.")
+        E, _ = self.energy_registry.compute(state)
+        return float(E.item())
+
     def step(self, state):
         X_old = state.X.clone()
-        E_old, _ = self.energy_registry.compute(state)
-        E_old = E_old.item()
+        E_old = self.evaluate_assignment(state.X, state=state)
 
         if self.mode == "sa":
 
@@ -44,8 +55,7 @@ class SimulatedAnnealingSampler:
 
             state.X = X_new
 
-            E_new, _ = self.energy_registry.compute(state)
-            E_new = E_new.item()
+            E_new = self.evaluate_assignment(state.X, state=state)
 
             dE = E_new - E_old
 
@@ -63,8 +73,7 @@ class SimulatedAnnealingSampler:
 
                 state.X = X_new
 
-                E_new, _ = self.energy_registry.compute(state)
-                E_new = E_new.item()
+                E_new = self.evaluate_assignment(state.X, state=state)
 
                 if E_new < best_E:
                     best_E = E_new

@@ -11,8 +11,9 @@ from dynamics.memory_update import MemoryUpdater
 from orchestrator.base import Agent, Assignment, BaseOrchestrator, Task
 
 class GreedyOrchestrator(BaseOrchestrator):
-    def __init__(self, cfg, initial_state=None, W_risk=None, mode="local_improvement"):
+    def __init__(self, cfg, initial_state=None, W_risk=None, mode="local_improvement", landscape=None):
         self.cfg = cfg
+        self.landscape = landscape
         m = cfg["model"]
         self.N = m["num_agents"]
         self.M = m["num_tasks"]
@@ -64,6 +65,8 @@ class GreedyOrchestrator(BaseOrchestrator):
         self.memory_updater = MemoryUpdater(self.eta_memory)
 
     def total_energy(self):
+        if self.landscape is not None:
+            return float(self.landscape.evaluate(self.state.X))
         total, _ = self.energy_registry.compute(self.state)
         return total
 
@@ -116,8 +119,11 @@ class GreedyOrchestrator(BaseOrchestrator):
                 self.state.X = X_prop
                 
                 # Compute energy
-                E, _ = self.energy_registry.compute(self.state)
-                E_val = E.item()
+                if self.landscape is not None:
+                    E_val = self.landscape.evaluate(X_prop)
+                else:
+                    E, _ = self.energy_registry.compute(self.state)
+                    E_val = E.item()
                 
                 if E_val < best_E - 1e-6:  # Small epsilon to ensure real improvement
                     best_E = E_val
@@ -150,8 +156,11 @@ class GreedyOrchestrator(BaseOrchestrator):
                     best_E = float('inf')
                     for a in range(self.N):
                         self.state.X[a, t] = 1.0
-                        E, _ = self.energy_registry.compute(self.state)
-                        E_val = E.item()
+                        if self.landscape is not None:
+                            E_val = self.landscape.evaluate(self.state.X)
+                        else:
+                            E, _ = self.energy_registry.compute(self.state)
+                            E_val = E.item()
                         if E_val < best_E:
                             best_E = E_val
                             best_a = a
