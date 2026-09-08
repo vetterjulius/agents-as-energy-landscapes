@@ -3,6 +3,7 @@ import torch
 from .base import Orchestrator
 from ..benchmark.scenarios.base import ProblemInstance
 from state.orchestration_state import OrchestrationState
+from landscape import Landscape, LandscapeState, ProblemContext
 from model.orchestrator import Orchestrator as SystemOrchestrator
 
 
@@ -40,10 +41,31 @@ class EnergyBasedOrchestrator(Orchestrator):
 
         model_cfg = self._build_model_config(N, M, d)
 
+        landscape = None
+        if self.theta_mode == "static" and model_cfg["model"].get("memory_mode", "static") == "static":
+            landscape = Landscape(
+                problem=ProblemContext(
+                    s=state.s,
+                    c=state.c,
+                    C=state.C,
+                    W_risk=problem.risk_weights,
+                    N=N,
+                    M=M,
+                    d=d,
+                    lambda_align=model_cfg["model"]["lambda_align"],
+                    lambda_memory=model_cfg["model"].get("lambda_memory"),
+                    interaction_weight=model_cfg["model"]["interaction_weight"],
+                    cost_weight=model_cfg["model"]["cost_weight"],
+                    risk_weight=model_cfg["model"]["risk_weight"],
+                ),
+                state=LandscapeState(kappa=state.kappa, Theta=state.Theta),
+            )
+
         orchestrator = SystemOrchestrator(
             model_cfg,
             initial_state=state,
             W_risk=problem.risk_weights,
+            landscape=landscape,
         )
 
         self.energy_history = [

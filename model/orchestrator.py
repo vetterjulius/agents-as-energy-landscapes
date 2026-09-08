@@ -146,6 +146,7 @@ class Orchestrator:
             target_accept=self.target_accept,
             num_candidates=self.proposal_candidates,
             mode=sampler_mode,
+            landscape=self.landscape,
         )
 
         self.theta_updater = ThetaUpdater(self.eta_theta)
@@ -202,9 +203,17 @@ class Orchestrator:
 
     def total_energy(self):
         if self.landscape is not None:
-            return float(self.landscape.evaluate(self.state.X))
+            return self.landscape.evaluate(self.state.X)
         total, _ = self.energy_registry.compute(self.state)
         return total
+
+    def _evaluate_assignment(self, X):
+        if self.landscape is not None:
+            return self.landscape.evaluate(X)
+        candidate_state = self.state.clone()
+        candidate_state.X = X
+        total, _ = self.energy_registry.compute(candidate_state)
+        return float(total)
 
     @property
     def T(self):
@@ -245,8 +254,7 @@ class Orchestrator:
     def _find_best_reassignment(self):
         X_orig = self.state.X.clone()
         best_X = X_orig.clone()
-        best_E, _ = self.energy_registry.compute(self.state)
-        best_E = best_E.item()
+        best_E = self._evaluate_assignment(X_orig)
         improved = False
 
         for t in range(self.M):
@@ -259,8 +267,7 @@ class Orchestrator:
                 X_prop[a_curr, t] = 0.0
                 X_prop[a, t] = 1.0
                 self.state.X = X_prop
-                E, _ = self.energy_registry.compute(self.state)
-                E_val = E.item()
+                E_val = self._evaluate_assignment(X_prop)
 
                 if E_val < best_E - 1e-6:
                     best_E = E_val
@@ -306,8 +313,7 @@ class Orchestrator:
                 X_init[:, t] = 0.0
                 X_init[a, t] = 1.0
                 self.state.X = X_init
-                E, _ = self.energy_registry.compute(self.state)
-                E_val = E.item()
+                E_val = self._evaluate_assignment(X_init)
                 if E_val < best_E:
                     best_E = E_val
                     best_agent = a

@@ -70,6 +70,14 @@ class GreedyOrchestrator(BaseOrchestrator):
         total, _ = self.energy_registry.compute(self.state)
         return total
 
+    def _evaluate_assignment(self, X):
+        if self.landscape is not None:
+            return self.landscape.evaluate(X)
+        candidate_state = self.state.clone()
+        candidate_state.X = X
+        total, _ = self.energy_registry.compute(candidate_state)
+        return float(total)
+
     def solve(self, tasks: list[Task], agents: list[Agent]) -> Assignment:
         assignment = Assignment()
         if not tasks or not agents:
@@ -98,8 +106,7 @@ class GreedyOrchestrator(BaseOrchestrator):
         """
         X_orig = self.state.X.clone()
         best_X = X_orig.clone()
-        best_E, _ = self.energy_registry.compute(self.state)
-        best_E = best_E.item()
+        best_E = self._evaluate_assignment(X_orig)
         improved = False
 
         # Iterate over all tasks
@@ -119,11 +126,7 @@ class GreedyOrchestrator(BaseOrchestrator):
                 self.state.X = X_prop
                 
                 # Compute energy
-                if self.landscape is not None:
-                    E_val = self.landscape.evaluate(X_prop)
-                else:
-                    E, _ = self.energy_registry.compute(self.state)
-                    E_val = E.item()
+                E_val = self._evaluate_assignment(X_prop)
                 
                 if E_val < best_E - 1e-6:  # Small epsilon to ensure real improvement
                     best_E = E_val
@@ -156,11 +159,7 @@ class GreedyOrchestrator(BaseOrchestrator):
                     best_E = float('inf')
                     for a in range(self.N):
                         self.state.X[a, t] = 1.0
-                        if self.landscape is not None:
-                            E_val = self.landscape.evaluate(self.state.X)
-                        else:
-                            E, _ = self.energy_registry.compute(self.state)
-                            E_val = E.item()
+                        E_val = self._evaluate_assignment(self.state.X)
                         if E_val < best_E:
                             best_E = E_val
                             best_a = a

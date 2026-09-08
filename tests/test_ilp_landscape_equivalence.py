@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 from dynamics.proposal import AssignmentProposal
 from dynamics.sampler import SimulatedAnnealingSampler
@@ -98,3 +99,36 @@ def test_sampler_supports_landscape_evaluation_adapter():
     )
 
     assert abs(sampler.evaluate_assignment(X) - landscape.evaluate(X)) < 1e-6
+
+
+@pytest.mark.parametrize("N,M", [(2, 2), (2, 3), (3, 2), (3, 3)])
+def test_compiled_ilp_matches_landscape_for_tiny_varied_cases(N, M):
+    torch.manual_seed(100 + N * 10 + M)
+    d = 3
+    problem = ProblemContext(
+        s=torch.randn(N, d),
+        c=torch.randn(M, d),
+        C=torch.rand(M, M),
+        W_risk=torch.randn(3 * d, 1),
+        N=N,
+        M=M,
+        d=d,
+        lambda_align=0.5,
+        lambda_memory=0.5,
+        interaction_weight=1.0,
+        cost_weight=1.0,
+        risk_weight=1.0,
+    )
+    theta = torch.randn(M, M)
+    theta = (theta + theta.T) / 2.0
+    theta.fill_diagonal_(0.0)
+    landscape = Landscape(
+        problem=problem,
+        state=LandscapeState(kappa=torch.randn(N, d), Theta=theta),
+    )
+
+    errors = [
+        abs(landscape.evaluate(X) - compiled_ilp_objective(X, landscape))
+        for X in enumerate_valid_assignments(problem)
+    ]
+    assert max(errors, default=0.0) < 1e-6
