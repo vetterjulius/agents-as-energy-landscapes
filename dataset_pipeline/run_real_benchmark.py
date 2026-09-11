@@ -79,6 +79,7 @@ def main():
         "Beam Search": BeamSearchOrchestrator(beam_width=5),
         "Tabu Search": TabuSearchOrchestrator(max_iterations=50, tabu_tenure=5),
         "Market Auction": MarketAuctionOrchestrator(alpha_load=0.5, beta_synergy=0.5),
+        "Market Auction": MarketAuctionOrchestrator(alpha_load=0.5, beta_synergy=0.5),
         "Energy (Hybrid)": EnergyHybridOrchestrator(cfg),
         "EBMAO (Hybrid)": EBMAOHybridOrchestrator(cfg),
         "Energy (Hybrid)": EnergyHybridOrchestrator(real_cfg),
