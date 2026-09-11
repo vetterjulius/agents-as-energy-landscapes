@@ -78,6 +78,8 @@ class ControlledBenchmarkRunner:
         landscape_id: str,
         adaptation_mode: str,
         trajectory: List[Any],
+        reference_energy: Optional[float] = None,
+        reference_method: Optional[str] = None,
     ) -> Tuple[TrajectorySummary, List[EpisodeRecord]]:
         """
         Execute one multi-episode run for a given method on a scenario trajectory.
@@ -191,20 +193,34 @@ class ControlledBenchmarkRunner:
             )
 
             # 5. Explicit Episode Boundary Adaptation
-            next_initial_theta = (
-                trajectory[ep + 1].interaction_graph.clone()
-                if ep + 1 < len(trajectory)
-                else problem_inst.interaction_graph.clone()
-            )
-
+            # STRICTLY from current episode data only — no future trajectory access
             current_landscape_state = adaptation_mgr.step(
                 current_state=current_landscape_state,
                 X=X_opt,
                 problem=problem_ctx,
-                next_initial_theta=next_initial_theta,
             )
 
             prev_X = X_opt.clone()
+
+        if reference_energy is None:
+            target_ep = min(self.cfg.perturb_episode, len(trajectory) - 1)
+            target_inst = trajectory[target_ep]
+            gt_ctx = problem_instance_to_problem_context(
+                target_inst,
+                lambda_align=self.cfg.lambda_align,
+                lambda_memory=self.cfg.lambda_memory,
+                interaction_weight=self.cfg.interaction_weight,
+                cost_weight=self.cfg.cost_weight,
+                risk_weight=self.cfg.risk_weight,
+            )
+            gt_state = LandscapeState(
+                kappa=torch.zeros(N, d, dtype=torch.float32),
+                Theta=target_inst.interaction_graph.clone(),
+            )
+            gt_landscape = Landscape(problem=gt_ctx, state=gt_state)
+            ref_sol = self.ilp_solver.solve(gt_landscape)
+            reference_energy = ref_sol.energy
+            reference_method = "exact_optimal" if ref_sol.is_optimal else "ilp_solver_fallback"
 
         summary = compute_trajectory_summary(
             records=records,
@@ -212,6 +228,8 @@ class ControlledBenchmarkRunner:
             perturb_episode=self.cfg.perturb_episode,
             pre_window=self.cfg.pre_window,
             post_window=self.cfg.post_window,
+            reference_energy=reference_energy,
+            reference_method=reference_method,
         )
         return summary, records
 
@@ -271,6 +289,26 @@ class ControlledBenchmarkRunner:
 
                 problem_id = f"{scenario_id}_N{self.cfg.num_agents}_M{self.cfg.num_tasks}_seed{seed}"
 
+                # Compute solver-independent reference energy ONCE per (scenario, seed)
+                target_ep = min(self.cfg.perturb_episode, len(trajectory) - 1)
+                target_inst = trajectory[target_ep]
+                ref_ctx = problem_instance_to_problem_context(
+                    target_inst,
+                    lambda_align=self.cfg.lambda_align,
+                    lambda_memory=self.cfg.lambda_memory,
+                    interaction_weight=self.cfg.interaction_weight,
+                    cost_weight=self.cfg.cost_weight,
+                    risk_weight=self.cfg.risk_weight,
+                )
+                ref_state = LandscapeState(
+                    kappa=torch.zeros(self.cfg.num_agents, self.cfg.dim, dtype=torch.float32),
+                    Theta=target_inst.interaction_graph.clone(),
+                )
+                ref_landscape = Landscape(problem=ref_ctx, state=ref_state)
+                ref_sol = self.ilp_solver.solve(ref_landscape)
+                ref_energy = ref_sol.energy
+                ref_method = "exact_optimal" if ref_sol.is_optimal else "ilp_solver_fallback"
+
                 for solver_id, landscape_id, adapt_mode in cells:
                     current_run_idx += 1
                     run_id = f"run_{scenario_id[:4].lower()}_s{seed}_{solver_id[:2].lower()}_{adapt_mode[:4]}"
@@ -282,6 +320,8 @@ class ControlledBenchmarkRunner:
                         landscape_id=landscape_id,
                         adaptation_mode=adapt_mode,
                         trajectory=trajectory,
+                        reference_energy=ref_energy,
+                        reference_method=ref_method,
                     )
 
                     rec = {
@@ -298,6 +338,7 @@ class ControlledBenchmarkRunner:
                         "num_episodes": self.cfg.num_episodes,
                         "perturb_episode": self.cfg.perturb_episode,
                         "evaluation_budget": self.cfg.max_energy_evaluations,
+                        "max_energy_evaluations": self.cfg.max_energy_evaluations,
                         "recovery_time": summary.recovery_time,
                         "perf_drop": summary.perf_drop,
                         "cumulative_regret": summary.cumulative_regret,
@@ -316,6 +357,10 @@ class ControlledBenchmarkRunner:
                         "termination_reasons": summary.termination_reasons_summary,
                         "all_episodes_optimal": summary.all_episodes_optimal,
                         "fallback_used": summary.fallback_used,
+                        "recovery_threshold": summary.recovery_threshold,
+                        "reference_energy": summary.reference_energy,
+                        "reference_method": summary.reference_method,
+                        "recovery_window": summary.recovery_window,
                         "evaluation_landscape_id": summary.evaluation_landscape_id,
                         "git_commit": self.cfg.git_commit,
                         "benchmark_version": self.cfg.benchmark_version,
@@ -382,36 +427,53 @@ class ControlledBenchmarkRunner:
     def _compute_paired_statistics(self, runs_df: pd.DataFrame) -> List[Dict[str, Any]]:
         """
         Compute paired statistical tests strictly matched on (problem_id, scenario_id, seed).
-        """
-        stats_rows: List[Dict[str, Any]] = []
 
-        metrics_to_test = ["recovery_time", "mean_external_energy", "cumulative_regret"]
+        Hypothesis families (Holm-Bonferroni applied WITHIN each family):
+          Family 1 — PRIMARY: Adaptive Full vs Static on recovery_time.
+          Family 2 — SECONDARY: Adaptive Full vs Static on mean_external_energy, cumulative_regret.
+          Family 3 — ABLATION: SA kappa-only/theta-only vs Static.
+          Family 4 — SOLVER INTERACTION: Adaptive advantage SA vs Adaptive advantage Greedy.
+        """
+        # Collect rows per family
+        family1: List[Dict[str, Any]] = []
+        family2: List[Dict[str, Any]] = []
+        family3: List[Dict[str, Any]] = []
+        family4: List[Dict[str, Any]] = []
 
         for scenario_id in self.cfg.scenarios:
             scen_df = runs_df[runs_df["scenario_id"] == scenario_id]
 
-            # 1. Main Matrix Pairwise Comparisons: Adaptive Full vs Static
+            # --- Family 1 & 2: Primary matrix adaptive vs static ---
             for solver_id in ["Simulated Annealing", "Energy Greedy"]:
                 adapt_df = scen_df[(scen_df["solver_id"] == solver_id) & (scen_df["adaptation_mode"] == "full")]
                 stat_df = scen_df[(scen_df["solver_id"] == solver_id) & (scen_df["adaptation_mode"] == "static")]
 
-                # Match by seed
                 merged = pd.merge(adapt_df, stat_df, on="seed", suffixes=("_adapt", "_stat"))
                 if len(merged) == 0:
                     continue
 
-                for metric in metrics_to_test:
+                # Family 1: PRIMARY — recovery_time
+                a_vals = merged["recovery_time_adapt"].tolist()
+                s_vals = merged["recovery_time_stat"].tolist()
+                res = analyze_paired_comparison(a_vals, s_vals, "recovery_time", f"{solver_id}: Adaptive Full - Static")
+                row = asdict(res)
+                row["scenario_id"] = scenario_id
+                row["solver_id"] = solver_id
+                row["hypothesis_family"] = "Family 1: PRIMARY"
+                family1.append(row)
+
+                # Family 2: SECONDARY — mean_external_energy and cumulative_regret
+                for metric in ["mean_external_energy", "cumulative_regret"]:
                     a_vals = merged[f"{metric}_adapt"].tolist()
                     s_vals = merged[f"{metric}_stat"].tolist()
-                    res = analyze_paired_comparison(
-                        a_vals, s_vals, metric, f"{solver_id}: Adaptive Full - Static"
-                    )
+                    res = analyze_paired_comparison(a_vals, s_vals, metric, f"{solver_id}: Adaptive Full - Static")
                     row = asdict(res)
                     row["scenario_id"] = scenario_id
                     row["solver_id"] = solver_id
-                    stats_rows.append(row)
+                    row["hypothesis_family"] = "Family 2: SECONDARY"
+                    family2.append(row)
 
-            # 2. Ablations vs Static (for Simulated Annealing)
+            # --- Family 3: ABLATION — kappa-only and theta-only vs static for SA ---
             for abl_mode in ["kappa-only", "theta-only"]:
                 abl_df = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == abl_mode)]
                 stat_df = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "static")]
@@ -419,19 +481,17 @@ class ControlledBenchmarkRunner:
                 if len(merged) == 0:
                     continue
 
-                for metric in metrics_to_test:
+                for metric in ["recovery_time", "mean_external_energy", "cumulative_regret"]:
                     a_vals = merged[f"{metric}_abl"].tolist()
                     s_vals = merged[f"{metric}_stat"].tolist()
-                    res = analyze_paired_comparison(
-                        a_vals, s_vals, metric, f"SA Ablation ({abl_mode}) - Static"
-                    )
+                    res = analyze_paired_comparison(a_vals, s_vals, metric, f"SA Ablation ({abl_mode}) - Static")
                     row = asdict(res)
                     row["scenario_id"] = scenario_id
                     row["solver_id"] = "Simulated Annealing"
-                    stats_rows.append(row)
+                    row["hypothesis_family"] = "Family 3: ABLATION"
+                    family3.append(row)
 
-            # 3. Solver Interaction Analysis
-            # Test whether Adaptive - Static difference differs between SA and Greedy
+            # --- Family 4: SOLVER INTERACTION ---
             sa_adapt = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "full")]
             sa_stat = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "static")]
             gr_adapt = scen_df[(scen_df["solver_id"] == "Energy Greedy") & (scen_df["adaptation_mode"] == "full")]
@@ -442,7 +502,7 @@ class ControlledBenchmarkRunner:
             m_both = pd.merge(m_sa, m_gr, on="seed", suffixes=("_sa", "_gr"))
 
             if len(m_both) >= 2:
-                for metric in metrics_to_test:
+                for metric in ["recovery_time", "mean_external_energy", "cumulative_regret"]:
                     inter_res = analyze_solver_interaction(
                         sa_adaptive=m_both[f"{metric}_adapt_sa"].tolist(),
                         sa_static=m_both[f"{metric}_stat_sa"].tolist(),
@@ -450,11 +510,12 @@ class ControlledBenchmarkRunner:
                         greedy_static=m_both[f"{metric}_stat_gr"].tolist(),
                         metric_name=metric,
                     )
-                    stats_rows.append({
+                    family4.append({
                         "metric": metric,
                         "comparison": "Solver Interaction (SA vs Greedy)",
                         "scenario_id": scenario_id,
                         "solver_id": "Interaction",
+                        "hypothesis_family": "Family 4: SOLVER INTERACTION",
                         "n_pairs": inter_res.n_pairs,
                         "mean_adaptive": inter_res.mean_sa_diff,
                         "mean_static": inter_res.mean_greedy_diff,
@@ -468,13 +529,21 @@ class ControlledBenchmarkRunner:
                         "p_val_adjusted": None,
                     })
 
-        # Apply Holm-Bonferroni correction to primary permutation p-values
-        raw_p = [r["permutation_p_val"] for r in stats_rows]
-        adj_p = holm_bonferroni_correction(raw_p)
-        for i, adj in enumerate(adj_p):
-            stats_rows[i]["p_val_adjusted"] = adj
+        # Apply Holm-Bonferroni WITHIN each family (not globally)
+        def apply_holm_within_family(rows: List[Dict[str, Any]]) -> None:
+            if not rows:
+                return
+            raw_p = [r["permutation_p_val"] for r in rows]
+            adj_p = holm_bonferroni_correction(raw_p)
+            for row, adj in zip(rows, adj_p):
+                row["p_val_adjusted"] = adj
 
-        return stats_rows
+        apply_holm_within_family(family1)
+        apply_holm_within_family(family2)
+        apply_holm_within_family(family3)
+        apply_holm_within_family(family4)
+
+        return family1 + family2 + family3 + family4
 
     def _write_results_readme(
         self,

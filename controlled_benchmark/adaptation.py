@@ -52,26 +52,22 @@ class EpisodeAdaptationManager:
         current_state: LandscapeState,
         X: torch.Tensor,
         problem: ProblemContext,
-        next_initial_theta: torch.Tensor,
     ) -> LandscapeState:
         """
-        Compute explicit episode boundary adaptation.
+        Compute explicit episode boundary adaptation from current and past observations only.
 
         Args:
             current_state: LandscapeState at episode t.
             X: Binary assignment matrix (N, M) chosen at episode t.
             problem: ProblemContext of episode t.
-            next_initial_theta: Base interaction graph of episode t+1.
 
         Returns:
             New LandscapeState for episode t+1.
+            Strictly contains zero information from episode t+1 or beyond.
         """
         N = problem.N
         M = problem.M
         d = problem.d
-
-        new_kappa = torch.zeros(N, d, dtype=torch.float32)
-        new_Theta = next_initial_theta.clone()
 
         update_kappa = self.mode in ("kappa-only", "full")
         update_theta = self.mode in ("theta-only", "full")
@@ -101,9 +97,13 @@ class EpisodeAdaptationManager:
                     )
                 else:
                     new_kappa[a] = (1.0 - self.eta_memory * 0.1) * current_state.kappa[a]
+        else:
+            # Static and theta-only modes: kappa strictly retains its current state (starts at kappa_0)
+            new_kappa = current_state.kappa.clone()
 
         # 2. Structural Dependency (Theta) adaptation update
         if update_theta:
+            new_Theta = current_state.Theta.clone()
             co = X.T @ X
             co_sum = co.sum().item()
             if co_sum >= self.epsilon:
@@ -122,6 +122,9 @@ class EpisodeAdaptationManager:
                     (1.0 - self.eta_theta) * current_state.Theta
                     + self.eta_theta * (co_norm - old_running)
                 )
+        else:
+            # Static and kappa-only modes: Theta strictly retains Theta_0 across the entire trajectory
+            new_Theta = current_state.Theta.clone()
 
         return LandscapeState(
             kappa=new_kappa,

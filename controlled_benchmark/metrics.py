@@ -33,6 +33,28 @@ class EpisodeRecord:
     theta_diff_norm: float
 
 
+RECOVERY_WINDOW: int = 3
+
+
+def compute_recovery_threshold(
+    reference_energy: float,
+    tolerance_ratio: float = 0.10,
+    min_slack: float = 0.10,
+) -> float:
+    """
+    Strict solver-independent recovery threshold derived exclusively from a target reference energy.
+
+    Guarantees:
+    - Never derived from a solver's own post-shift trajectory.
+    - If reference_energy >= 0: tau = reference_energy + tolerance_ratio * max(reference_energy, min_slack).
+      (equals (1 + tolerance_ratio) * reference_energy when reference_energy >= min_slack)
+    - If reference_energy < 0: tau = reference_energy + tolerance_ratio * max(abs(reference_energy), min_slack).
+    - Threshold is strictly well-defined, solver-independent, and auditable.
+    """
+    slack = tolerance_ratio * max(abs(reference_energy), min_slack)
+    return float(reference_energy + slack)
+
+
 @dataclass
 class TrajectorySummary:
     """Summary metrics over a multi-episode scenario trajectory."""
@@ -58,6 +80,10 @@ class TrajectorySummary:
     termination_reasons_summary: str
     all_episodes_optimal: bool
     fallback_used: bool
+    recovery_threshold: float = 0.0
+    reference_energy: float = 0.0
+    reference_method: str = "exact_optimal"
+    recovery_window: int = RECOVERY_WINDOW
     evaluation_landscape_id: str = "external_ground_truth"
 
 
@@ -94,24 +120,25 @@ def compute_trajectory_summary(
     perturb_episode: int,
     pre_window: int = 10,
     post_window: int = 10,
+    reference_energy: Optional[float] = None,
+    reference_method: Optional[str] = None,
+    recovery_window: int = RECOVERY_WINDOW,
 ) -> TrajectorySummary:
     """
     Compute rigorous trajectory-level metrics.
 
     FORMAL PRIMARY METRIC: recovery_time
     ------------------------------------
-    Let E(t) be external ground truth energy at episode t in [0, T-1].
-    Pre-perturbation baseline E_pre is the mean over [max(0, perturb_episode - pre_window), perturb_episode - 1].
-    Post-perturbation baseline E_post is the mean over [T - post_window, T - 1].
+    The recovery threshold tau is derived EXCLUSIVELY from a solver-independent reference energy.
+    It is STRICTLY FORBIDDEN to compute tau from a solver's own post-shift trajectory.
 
-    Target recovery threshold tau:
-    - If scenario == 'Task Shift' (permanent shift): tau = 1.1 * E_post.
-    - Otherwise (Capability Drift, Dependency Change, Stationary): tau = 1.1 * E_pre.
+    Stability Window (RECOVERY_WINDOW = 3):
+    Recovery requires that starting from episode (perturb_episode + offset), the external energy
+    satisfies E(t) <= tau for at least `recovery_window` (default 3) consecutive episodes.
+    A single outlier or transient dip does NOT trigger recovery.
 
-    recovery_time is the first episode offset k in [0, T - perturb_episode - 1] such that:
-        E(perturb_episode + k) <= tau.
-    If E never reaches <= tau within the remaining episodes, recovery_time defaults to
-    the full remaining horizon (T - perturb_episode) [censored recovery].
+    If the condition is never met within the horizon, recovery_time is censored at
+    the full remaining horizon (T - perturb_episode).
     """
     total_episodes = len(records)
     external_energies = np.array([r.external_energy for r in records])
@@ -131,18 +158,37 @@ def compute_trajectory_summary(
     ep_post_idx = min(total_episodes - 1, perturb_episode)
     perf_drop = float(max(0.0, external_energies[ep_post_idx] - external_energies[ep_pre_idx]))
 
-    # Primary Metric: recovery_time
-    is_permanent = (scenario_id == "Task Shift")
-    target = 1.1 * post_base if is_permanent else 1.1 * pre_base
+    # Determine solver-independent reference energy and threshold
+    if reference_energy is not None:
+        ref_e = float(reference_energy)
+        ref_meth = str(reference_method or "exact_optimal")
+    else:
+        # Fallback if no reference is explicitly passed:
+        # Use pre-perturbation baseline (NEVER solver's own post_base!)
+        ref_e = pre_base
+        ref_meth = "pre_perturbation_baseline"
 
+    target = compute_recovery_threshold(ref_e)
+
+    # Primary Metric: recovery_time with 3-consecutive-episodes stability window
     recovery_time = float(total_episodes - perturb_episode)
-    for offset, ep in enumerate(range(perturb_episode, total_episodes)):
-        if external_energies[ep] <= target:
-            recovery_time = float(offset)
-            break
+    max_search_offset = total_episodes - perturb_episode - recovery_window + 1
 
-    # Secondary Metric: cumulative regret over post-perturbation horizon
-    cum_regret = float(np.sum(np.maximum(0.0, external_energies[perturb_episode:] - pre_base)))
+    if max_search_offset > 0:
+        for offset in range(max_search_offset):
+            ep = perturb_episode + offset
+            # Verify stability across recovery_window consecutive episodes
+            if all(external_energies[ep + w] <= target for w in range(recovery_window)):
+                recovery_time = float(offset)
+                break
+    else:
+        # If remaining episodes are fewer than recovery_window, check all remaining
+        rem = total_episodes - perturb_episode
+        if rem > 0 and all(external_energies[perturb_episode + w] <= target for w in range(rem)):
+            recovery_time = 0.0
+
+    # Secondary Metric: cumulative regret over post-perturbation horizon relative to reference
+    cum_regret = float(np.sum(np.maximum(0.0, external_energies[perturb_episode:] - ref_e)))
 
     # Secondary Metric: late-window convergence (energy std in late episodes)
     convergence = float(np.std(external_energies[post_start:]))
@@ -185,5 +231,9 @@ def compute_trajectory_summary(
         termination_reasons_summary=termination_summary,
         all_episodes_optimal=all_optimal,
         fallback_used=any_fallback,
+        recovery_threshold=target,
+        reference_energy=ref_e,
+        reference_method=ref_meth,
+        recovery_window=recovery_window,
         evaluation_landscape_id="external_ground_truth",
     )

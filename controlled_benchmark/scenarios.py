@@ -49,183 +49,90 @@ def make_initial_landscape_state(problem: ProblemInstance) -> LandscapeState:
     )
 
 
-def generate_capability_drift_episode(
-    episode: int,
-    seed: int,
-    perturb_episode: int,
-    N: int,
-    M: int,
-    d: int,
-) -> ProblemInstance:
-    """
-    Agent expertise changes abruptly at episode >= perturb_episode.
-    Swaps Agent 0 and Agent 1 capability embeddings.
-    Reuses existing dynamic benchmark semantics.
-    """
-    torch.manual_seed(seed + episode)
-    random.seed(seed + episode)
-
-    # Base embeddings generated from seed
-    torch.manual_seed(seed)
-    base_s = torch.randn(N, d)
-
-    torch.manual_seed(seed + episode)
-    s = base_s.clone()
-    if episode >= perturb_episode and N >= 2:
-        s[0], s[1] = base_s[1].clone(), base_s[0].clone()
-
+def clone_problem_instance(base: ProblemInstance) -> ProblemInstance:
+    """Perform an exact, isolated clone of a ProblemInstance."""
     agents = [
-        Agent(id=f"agent_{i}", role="drift_agent", capability_embedding=s[i])
-        for i in range(N)
+        Agent(
+            id=a.id,
+            role=a.role,
+            capability_embedding=a.capability_embedding.clone(),
+        )
+        for a in base.agents
     ]
     tasks = [
         Task(
-            id=f"task_{j}",
-            embedding=torch.randn(d),
-            estimated_cost=random.uniform(0.5, 1.5),
+            id=t.id,
+            embedding=t.embedding.clone(),
+            estimated_cost=float(t.estimated_cost),
         )
-        for j in range(M)
+        for t in base.tasks
     ]
-
-    interaction_graph = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.3:
-                val = random.uniform(0.1, 0.8)
-                interaction_graph[j, k] = val
-                interaction_graph[k, j] = val
-
-    co_assignment_costs = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.2:
-                val = random.uniform(0.1, 0.5)
-                co_assignment_costs[j, k] = val
-                co_assignment_costs[k, j] = val
-
-    risk_weights = torch.randn(3 * d, 1)
-
     return ProblemInstance(
         agents=agents,
         tasks=tasks,
-        interaction_graph=interaction_graph,
-        co_assignment_costs=co_assignment_costs,
-        risk_weights=risk_weights,
+        interaction_graph=base.interaction_graph.clone(),
+        co_assignment_costs=base.co_assignment_costs.clone(),
+        risk_weights=base.risk_weights.clone(),
     )
 
 
-def generate_task_shift_episode(
-    episode: int,
+def generate_base_problem(
     seed: int,
-    perturb_episode: int,
     N: int,
     M: int,
     d: int,
+    scenario_id: str | None = None,
 ) -> ProblemInstance:
     """
-    Task distribution shifts abruptly by +1.5 at episode >= perturb_episode.
-    Reuses existing dynamic benchmark semantics.
+    Generate exactly ONE deterministic base ProblemInstance per (seed, N, M, d).
+
+    Strict fairness guarantee:
+    - Base parameters (agents, tasks, costs, graph, risk) are generated once per seed.
+    - Zero re-rolling of base parameters per episode.
+    - Uses isolated torch.Generator and random.Random seeded by seed (no global side effects).
     """
-    torch.manual_seed(seed + episode)
-    random.seed(seed + episode)
+    rng_torch = torch.Generator().manual_seed(seed)
+    rng_py = random.Random(seed)
 
-    torch.manual_seed(seed)
-    s = torch.randn(N, d)
-
-    torch.manual_seed(seed + episode)
+    base_s = torch.randn(N, d, generator=rng_torch)
     agents = [
-        Agent(id=f"agent_{i}", role="shift_agent", capability_embedding=s[i])
+        Agent(id=f"agent_{i}", role=f"agent_{i}", capability_embedding=base_s[i].clone())
         for i in range(N)
     ]
-
-    shift = torch.zeros(d)
-    if episode >= perturb_episode:
-        shift = torch.ones(d) * 1.5
 
     tasks = [
         Task(
             id=f"task_{j}",
-            embedding=torch.randn(d) + shift,
-            estimated_cost=random.uniform(0.5, 1.5),
+            embedding=torch.randn(d, generator=rng_torch),
+            estimated_cost=rng_py.uniform(0.5, 1.5),
         )
         for j in range(M)
     ]
 
     interaction_graph = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.3:
-                val = random.uniform(0.1, 0.8)
-                interaction_graph[j, k] = val
-                interaction_graph[k, j] = val
-
-    co_assignment_costs = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.2:
-                val = random.uniform(0.1, 0.5)
-                co_assignment_costs[j, k] = val
-                co_assignment_costs[k, j] = val
-
-    risk_weights = torch.randn(3 * d, 1)
-
-    return ProblemInstance(
-        agents=agents,
-        tasks=tasks,
-        interaction_graph=interaction_graph,
-        co_assignment_costs=co_assignment_costs,
-        risk_weights=risk_weights,
-    )
-
-
-def generate_dependency_change_episode(
-    episode: int,
-    seed: int,
-    perturb_episode: int,
-    N: int,
-    M: int,
-    d: int,
-) -> ProblemInstance:
-    """
-    Task dependency interaction graph Theta abruptly switches pattern at episode >= perturb_episode.
-    Reuses existing dynamic benchmark semantics.
-    """
-    torch.manual_seed(seed + episode)
-    random.seed(seed + episode)
-
-    torch.manual_seed(seed)
-    s = torch.randn(N, d)
-
-    torch.manual_seed(seed + episode)
-    agents = [
-        Agent(id=f"agent_{i}", role="dep_agent", capability_embedding=s[i])
-        for i in range(N)
-    ]
-    tasks = [
-        Task(
-            id=f"task_{j}",
-            embedding=torch.randn(d),
-            estimated_cost=random.uniform(0.5, 1.5),
-        )
-        for j in range(M)
-    ]
-
-    interaction_graph = torch.zeros(M, M)
-    if episode < perturb_episode:
+    if scenario_id == "Dependency Change":
         # Pattern 1: Adjacent pairs have synergy
         for i in range(0, M, 2):
             if i + 1 < M:
                 interaction_graph[i, i + 1] = 1.0
                 interaction_graph[i + 1, i] = 1.0
     else:
-        # Pattern 2: Shifted pairs have synergy
-        for i in range(M):
-            j = (i + 2) % M
-            interaction_graph[i, j] = 1.0
-            interaction_graph[j, i] = 1.0
+        for j in range(M):
+            for k in range(j + 1, M):
+                if rng_py.random() < 0.3:
+                    val = rng_py.uniform(0.1, 0.8)
+                    interaction_graph[j, k] = val
+                    interaction_graph[k, j] = val
 
     co_assignment_costs = torch.zeros(M, M)
-    risk_weights = torch.randn(3 * d, 1)
+    for j in range(M):
+        for k in range(j + 1, M):
+            if rng_py.random() < 0.2:
+                val = rng_py.uniform(0.1, 0.5)
+                co_assignment_costs[j, k] = val
+                co_assignment_costs[k, j] = val
+
+    risk_weights = torch.randn(3 * d, 1, generator=rng_torch)
 
     return ProblemInstance(
         agents=agents,
@@ -243,56 +150,100 @@ def generate_stationary_episode(
     N: int,
     M: int,
     d: int,
+    base_problem: ProblemInstance | None = None,
 ) -> ProblemInstance:
     """
-    Control condition: environment distribution remains completely stationary across all episodes.
-    Evaluates whether unnecessary adaptation introduces degradation.
+    Stationary Control Condition:
+    All exogenous quantities remain 100% bitwise identical across all episodes.
     """
-    torch.manual_seed(seed + episode)
-    random.seed(seed + episode)
+    if base_problem is None:
+        base_problem = generate_base_problem(seed=seed, N=N, M=M, d=d, scenario_id="Stationary")
+    return clone_problem_instance(base_problem)
 
-    torch.manual_seed(seed)
-    s = torch.randn(N, d)
 
-    torch.manual_seed(seed + episode)
-    agents = [
-        Agent(id=f"agent_{i}", role="stat_agent", capability_embedding=s[i])
-        for i in range(N)
-    ]
-    tasks = [
-        Task(
-            id=f"task_{j}",
-            embedding=torch.randn(d),
-            estimated_cost=random.uniform(0.5, 1.5),
-        )
-        for j in range(M)
-    ]
+def generate_capability_drift_episode(
+    episode: int,
+    seed: int,
+    perturb_episode: int,
+    N: int,
+    M: int,
+    d: int,
+    base_problem: ProblemInstance | None = None,
+) -> ProblemInstance:
+    """
+    Capability Drift:
+    - Before T_perturb: identical to base problem.
+    - At and after T_perturb: exclusively Agent 0 and Agent 1 swap capabilities.
+    - Tasks, costs, risk weights, and interaction graph remain strictly unchanged.
+    """
+    if base_problem is None:
+        base_problem = generate_base_problem(seed=seed, N=N, M=M, d=d, scenario_id="Capability Drift")
 
-    interaction_graph = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.3:
-                val = random.uniform(0.1, 0.8)
-                interaction_graph[j, k] = val
-                interaction_graph[k, j] = val
+    inst = clone_problem_instance(base_problem)
+    if episode >= perturb_episode and N >= 2:
+        s0 = inst.agents[0].capability_embedding.clone()
+        s1 = inst.agents[1].capability_embedding.clone()
+        inst.agents[0].capability_embedding = s1
+        inst.agents[1].capability_embedding = s0
 
-    co_assignment_costs = torch.zeros(M, M)
-    for j in range(M):
-        for k in range(j + 1, M):
-            if random.random() < 0.2:
-                val = random.uniform(0.1, 0.5)
-                co_assignment_costs[j, k] = val
-                co_assignment_costs[k, j] = val
+    return inst
 
-    risk_weights = torch.randn(3 * d, 1)
 
-    return ProblemInstance(
-        agents=agents,
-        tasks=tasks,
-        interaction_graph=interaction_graph,
-        co_assignment_costs=co_assignment_costs,
-        risk_weights=risk_weights,
-    )
+def generate_task_shift_episode(
+    episode: int,
+    seed: int,
+    perturb_episode: int,
+    N: int,
+    M: int,
+    d: int,
+    base_problem: ProblemInstance | None = None,
+) -> ProblemInstance:
+    """
+    Task Shift:
+    - Before T_perturb: identical to base problem.
+    - At and after T_perturb: exclusively task embeddings shift by +1.5.
+    - Agents, costs, risk weights, and interaction graph remain strictly unchanged.
+    """
+    if base_problem is None:
+        base_problem = generate_base_problem(seed=seed, N=N, M=M, d=d, scenario_id="Task Shift")
+
+    inst = clone_problem_instance(base_problem)
+    if episode >= perturb_episode:
+        shift = torch.ones(d) * 1.5
+        for task in inst.tasks:
+            task.embedding = task.embedding + shift
+
+    return inst
+
+
+def generate_dependency_change_episode(
+    episode: int,
+    seed: int,
+    perturb_episode: int,
+    N: int,
+    M: int,
+    d: int,
+    base_problem: ProblemInstance | None = None,
+) -> ProblemInstance:
+    """
+    Dependency Change:
+    - Before T_perturb: Pattern 1 (adjacent pair synergies).
+    - At and after T_perturb: Pattern 2 (stride-2 shifted pair synergies).
+    - Agents, tasks, costs, and risk weights remain strictly unchanged.
+    """
+    if base_problem is None:
+        base_problem = generate_base_problem(seed=seed, N=N, M=M, d=d, scenario_id="Dependency Change")
+
+    inst = clone_problem_instance(base_problem)
+    if episode >= perturb_episode:
+        new_graph = torch.zeros(M, M)
+        for i in range(M):
+            j = (i + 2) % M
+            new_graph[i, j] = 1.0
+            new_graph[j, i] = 1.0
+        inst.interaction_graph = new_graph
+
+    return inst
 
 
 SCENARIO_GENERATORS = {
@@ -322,6 +273,14 @@ def generate_scenario_trajectory(
         )
 
     generator_fn = SCENARIO_GENERATORS[scenario_id]
+    base_problem = generate_base_problem(
+        seed=seed,
+        N=N,
+        M=M,
+        d=d,
+        scenario_id=scenario_id,
+    )
+
     trajectory = []
     for ep in range(num_episodes):
         inst = generator_fn(
@@ -331,6 +290,7 @@ def generate_scenario_trajectory(
             N=N,
             M=M,
             d=d,
+            base_problem=base_problem,
         )
         trajectory.append(inst)
 

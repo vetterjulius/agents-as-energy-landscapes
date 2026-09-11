@@ -69,6 +69,7 @@ class SolverResult:
     mip_gap: Optional[float] = None
     timeout: bool = False
     fallback_used: bool = False
+    time_limit_sec: Optional[float] = None
 
 
 class EnergyAwareSimulatedAnnealingSolver:
@@ -354,6 +355,7 @@ class FixedLandscapeILPSolver:
                 mip_gap=0.0,
                 timeout=False,
                 fallback_used=False,
+                time_limit_sec=self.time_limit_sec,
             )
 
         # 1. Compute Linear Cost Matrix L (N, M)
@@ -480,6 +482,7 @@ class FixedLandscapeILPSolver:
                 mip_gap=float(mip_gap) if mip_gap is not None else 0.0,
                 timeout=False,
                 fallback_used=False,
+                time_limit_sec=self.time_limit_sec,
             )
         else:
             # Solver timed out or failed to find an optimal solution within limit.
@@ -505,4 +508,5 @@ class FixedLandscapeILPSolver:
                 mip_gap=None,
                 timeout=(status_str == "timeout"),
                 fallback_used=True,
+                time_limit_sec=self.time_limit_sec,
             )
