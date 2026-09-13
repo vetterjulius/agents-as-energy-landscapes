@@ -45,7 +45,7 @@ class SolverInteractionResult:
 def paired_confidence_interval(
     diff: np.ndarray, confidence: float = 0.95
 ) -> Tuple[float, float]:
-    """Compute 95% Studentized confidence interval for paired differences."""
+    """Compute a 95% t-based confidence interval for the mean paired difference."""
     n = len(diff)
     if n < 2:
         val = float(np.mean(diff)) if n == 1 else 0.0
@@ -64,9 +64,11 @@ def paired_permutation_test(
     seed: int = 42,
 ) -> float:
     """
-    Two-sided paired permutation test on matched differences.
+    Two-sided paired sign-flip permutation test.
 
-    Under H0: E[Adaptive - Static] = 0, signs of differences are exchangeable.
+    The null hypothesis is that the paired differences are
+    exchangeable under sign reversal, implying no systematic
+    directional treatment effect.
     Uses exact enumeration for n <= 16, and Monte Carlo sampling for n > 16.
     """
     n = len(diff)
@@ -97,7 +99,7 @@ def paired_permutation_test(
 def wilcoxon_signed_rank_test(diff: np.ndarray) -> float:
     """Wilcoxon signed-rank test on matched differences."""
     n = len(diff)
-    if n < 5 or np.all(np.abs(diff) < 1e-12):
+    if n == 0 or np.all(np.abs(diff) < 1e-12):
         return 1.0
     try:
         res = stats.wilcoxon(diff, alternative="two-sided")
@@ -153,6 +155,12 @@ def analyze_paired_comparison(
     """Run full paired statistical analysis for a single metric."""
     arr_a = np.array(adaptive_values, dtype=np.float64)
     arr_s = np.array(static_values, dtype=np.float64)
+    if len(arr_a) != len(arr_s):
+        raise ValueError("Paired samples must have equal length.")
+    if len(arr_a) == 0:
+        raise ValueError("Paired analysis requires at least one pair.")
+    if not np.all(np.isfinite(arr_a)) or not np.all(np.isfinite(arr_s)):
+        raise ValueError("Paired samples must contain only finite values.")
     diff = arr_a - arr_s
 
     ci_l, ci_u = paired_confidence_interval(diff)
@@ -189,8 +197,34 @@ def analyze_solver_interaction(
     Interaction difference for each matched seed i:
       I_i = (Adaptive_SA - Static_SA)_i - (Adaptive_Greedy - Static_Greedy)_i
     """
-    diff_sa = np.array(sa_adaptive, dtype=np.float64) - np.array(sa_static, dtype=np.float64)
-    diff_greedy = np.array(greedy_adaptive, dtype=np.float64) - np.array(greedy_static, dtype=np.float64)
+    arr_sa_adaptive = np.array(sa_adaptive, dtype=np.float64)
+    arr_sa_static = np.array(sa_static, dtype=np.float64)
+    arr_greedy_adaptive = np.array(greedy_adaptive, dtype=np.float64)
+    arr_greedy_static = np.array(greedy_static, dtype=np.float64)
+    lengths = {
+        len(arr_sa_adaptive),
+        len(arr_sa_static),
+        len(arr_greedy_adaptive),
+        len(arr_greedy_static),
+    }
+    if len(lengths) != 1:
+        raise ValueError("Solver interaction samples must have equal length.")
+    n_pairs = len(arr_sa_adaptive)
+    if n_pairs == 0:
+        raise ValueError("Solver interaction analysis requires at least one pair.")
+    if not all(
+        np.all(np.isfinite(values))
+        for values in (
+            arr_sa_adaptive,
+            arr_sa_static,
+            arr_greedy_adaptive,
+            arr_greedy_static,
+        )
+    ):
+        raise ValueError("Solver interaction samples must contain only finite values.")
+
+    diff_sa = arr_sa_adaptive - arr_sa_static
+    diff_greedy = arr_greedy_adaptive - arr_greedy_static
     interaction_diff = diff_sa - diff_greedy
 
     ci_l, ci_u = paired_confidence_interval(interaction_diff)
