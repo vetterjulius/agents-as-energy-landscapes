@@ -25,7 +25,8 @@ class BenchmarkConfig:
     """Explicit, fully serializable configuration for the controlled benchmark."""
 
     mode: str = "quick"  # 'quick' or 'research'
-    benchmark_version: str = "1.0.0"
+    benchmark_version: str = "1.1.0"
+    experiment_id: str = "controlled_benchmark_paired"
     git_commit: str = field(default_factory=get_git_revision)
 
     # Seeds: research mode defaults to 20 seeds (42..61), configurable to 30
@@ -41,11 +42,12 @@ class BenchmarkConfig:
     perturb_episode: int = 5
     pre_window: int = 3
     post_window: int = 3
+    post_ppee_window: int = 10
 
     # Budgets
     max_energy_evaluations: int = 150  # Hard common budget for stochastic/search solvers
     ilp_time_limit_sec: float = 5.0    # Exact reference wall-clock limit
-    run_ilp_dynamic: bool = True       # Whether to run ILP on dynamic episodes (small instances only)
+    run_ilp_dynamic: bool = False       # ILP is used only for the shared reference by default
 
     # Experimental Factors
     scenarios: List[str] = field(
@@ -101,9 +103,10 @@ class BenchmarkConfig:
             perturb_episode=5,
             pre_window=3,
             post_window=3,
+            post_ppee_window=10,
             max_energy_evaluations=150,
             ilp_time_limit_sec=5.0,
-            run_ilp_dynamic=True,
+            run_ilp_dynamic=False,
         )
         for k, v in overrides.items():
             setattr(cfg, k, v)
@@ -129,6 +132,7 @@ class BenchmarkConfig:
             perturb_episode=25,
             pre_window=10,
             post_window=10,
+            post_ppee_window=10,
             max_energy_evaluations=500,
             ilp_time_limit_sec=10.0,
             run_ilp_dynamic=False,  # For N=5, M=10, exact ILP dynamic sweep is 5^10 ~ 9.7M space; used as static reference

@@ -219,6 +219,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Freebuff
+.freebuff/
+
 .storage/
 
 results/

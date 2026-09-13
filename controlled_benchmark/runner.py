@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import csv
+import hashlib
 import json
 import os
+import platform
+import subprocess
+import sys
 import time
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 import torch
@@ -15,7 +19,7 @@ from controlled_benchmark.config import BenchmarkConfig
 from controlled_benchmark.metrics import (
     EpisodeRecord,
     TrajectorySummary,
-    compute_constraint_violations,
+    compute_co_assignment_conflicts,
     compute_coordination_score,
     compute_load_balance,
     compute_reconfig_cost,
@@ -34,41 +38,82 @@ from controlled_benchmark.solvers import (
     SolverResult,
 )
 from controlled_benchmark.statistics import (
-    PairedAnalysisResult,
-    SolverInteractionResult,
     analyze_paired_comparison,
     analyze_solver_interaction,
     holm_bonferroni_correction,
 )
-from landscape import Landscape, LandscapeState, ProblemContext
+from landscape import Landscape, LandscapeState
+
+
+def _get_git_dirty() -> bool:
+    try:
+        output = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return bool(output)
+    except Exception:
+        return False
+
+
+def _trajectory_fingerprint(trajectory: List[Any]) -> str:
+    digest = hashlib.sha256()
+    for problem in trajectory:
+        for agent in problem.agents:
+            digest.update(agent.capability_embedding.detach().cpu().numpy().tobytes())
+        for task in problem.tasks:
+            digest.update(task.embedding.detach().cpu().numpy().tobytes())
+        for tensor in (
+            problem.interaction_graph,
+            problem.co_assignment_costs,
+            problem.risk_weights,
+        ):
+            digest.update(tensor.detach().cpu().numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _slug(value: str) -> str:
+    return "_".join(value.lower().replace("-", " ").split())
 
 
 class ControlledBenchmarkRunner:
-    """
-    Primary Runner for the Controlled Landscape x Solver Experimental Benchmark.
-    """
+    """Runner for the controlled landscape/solver benchmark."""
 
     def __init__(self, config: BenchmarkConfig):
         self.cfg = config
         self.sa_solver = EnergyAwareSimulatedAnnealingSolver(
-            temperature_init=self.cfg.sa_temperature_init,
-            min_temperature=self.cfg.sa_min_temperature,
-            cooling_rate=self.cfg.sa_cooling_rate,
+            temperature_init=config.sa_temperature_init,
+            min_temperature=config.sa_min_temperature,
+            cooling_rate=config.sa_cooling_rate,
         )
         self.greedy_solver = EnergyAwareGreedySolver()
-        self.ilp_solver = FixedLandscapeILPSolver(
-            time_limit_sec=self.cfg.ilp_time_limit_sec
-        )
+        self.ilp_solver = FixedLandscapeILPSolver(time_limit_sec=config.ilp_time_limit_sec)
 
     def _get_initial_assignment(self, N: int, M: int) -> torch.Tensor:
-        """
-        Generate identical deterministic initial assignment for all compared methods.
-        Fairness: eliminates solver-specific initialization advantage.
-        """
         X = torch.zeros(N, M, dtype=torch.float32)
-        for t in range(M):
-            X[t % N, t] = 1.0
+        for task in range(M):
+            X[task % N, task] = 1.0
         return X
+
+    def _ground_truth_reference(
+        self, problem_inst: Any
+    ) -> Tuple[float, str, bool, bool]:
+        context = problem_instance_to_problem_context(
+            problem_inst,
+            lambda_align=self.cfg.lambda_align,
+            lambda_memory=self.cfg.lambda_memory,
+            interaction_weight=self.cfg.interaction_weight,
+            cost_weight=self.cfg.cost_weight,
+            risk_weight=self.cfg.risk_weight,
+        )
+        state = LandscapeState(
+            kappa=torch.zeros(self.cfg.num_agents, self.cfg.dim),
+            Theta=problem_inst.interaction_graph.clone(),
+        )
+        result = self.ilp_solver.solve(Landscape(context, state))
+        method = "exact_optimal" if result.is_optimal is True else "ilp_timeout_or_failure"
+        return float(result.energy), method, bool(result.is_optimal is True), bool(result.timeout)
 
     def run_trajectory(
         self,
@@ -80,27 +125,23 @@ class ControlledBenchmarkRunner:
         trajectory: List[Any],
         reference_energy: Optional[float] = None,
         reference_method: Optional[str] = None,
+        reference_valid: Optional[bool] = None,
     ) -> Tuple[TrajectorySummary, List[EpisodeRecord]]:
-        """
-        Execute one multi-episode run for a given method on a scenario trajectory.
-        """
-        N = self.cfg.num_agents
-        M = self.cfg.num_tasks
-        d = self.cfg.dim
-
-        adaptation_mgr = EpisodeAdaptationManager(
+        """Run one condition; adaptation at t only creates state for t+1."""
+        N, M, d = self.cfg.num_agents, self.cfg.num_tasks, self.cfg.dim
+        manager = EpisodeAdaptationManager(
             adaptation_mode=adaptation_mode,
             eta_memory=self.cfg.eta_memory,
             eta_theta=self.cfg.eta_theta,
         )
-
-        current_landscape_state = make_initial_landscape_state(trajectory[0])
+        current_state = make_initial_landscape_state(trajectory[0])
         records: List[EpisodeRecord] = []
-        prev_X: Optional[torch.Tensor] = None
+        previous_X: Optional[torch.Tensor] = None
+        previous_state: Optional[LandscapeState] = None
+        state_snapshots: Dict[int, LandscapeState] = {}
 
-        for ep, problem_inst in enumerate(trajectory):
-            # 1. Build immutable ProblemContext for current episode
-            problem_ctx = problem_instance_to_problem_context(
+        for episode, problem_inst in enumerate(trajectory):
+            context = problem_instance_to_problem_context(
                 problem_inst,
                 lambda_align=self.cfg.lambda_align,
                 lambda_memory=self.cfg.lambda_memory,
@@ -108,119 +149,95 @@ class ControlledBenchmarkRunner:
                 cost_weight=self.cfg.cost_weight,
                 risk_weight=self.cfg.risk_weight,
             )
-
-            # 2. Build explicit Landscape for current episode
-            # Solver landscape uses current adaptation state
-            solver_landscape = Landscape(
-                problem=problem_ctx,
-                state=current_landscape_state.clone(),
+            solver_landscape = Landscape(context, current_state)
+            ground_truth = Landscape(
+                context,
+                LandscapeState(
+                    kappa=torch.zeros(N, d),
+                    Theta=problem_inst.interaction_graph.clone(),
+                ),
             )
-
-            # Ground truth external landscape: kappa=0, Theta=env interaction graph
-            ground_truth_state = LandscapeState(
-                kappa=torch.zeros(N, d, dtype=torch.float32),
-                Theta=problem_inst.interaction_graph.clone(),
+            budgeted = BudgetedLandscape(
+                solver_landscape, max_evaluations=self.cfg.max_energy_evaluations
             )
-            ground_truth_landscape = Landscape(
-                problem=problem_ctx,
-                state=ground_truth_state,
-            )
-
-            # 3. Solver Optimization under Strict Budget
             initial_X = self._get_initial_assignment(N, M)
-            budgeted_landscape = BudgetedLandscape(
-                landscape=solver_landscape,
-                max_evaluations=self.cfg.max_energy_evaluations,
-            )
 
-            solver_res: SolverResult
             if solver_id == "Simulated Annealing":
-                # Ensure reproducibility of stochastic search
-                solver_seed = seed * 10000 + ep
-                solver_res = self.sa_solver.solve(
-                    budgeted_landscape=budgeted_landscape,
-                    initial_X=initial_X,
-                    seed=solver_seed,
+                solver_result = self.sa_solver.solve(
+                    budgeted, initial_X, seed=seed * 10000 + episode
                 )
             elif solver_id == "Energy Greedy":
-                solver_res = self.greedy_solver.solve(
-                    budgeted_landscape=budgeted_landscape,
-                    initial_X=initial_X,
-                )
+                solver_result = self.greedy_solver.solve(budgeted, initial_X)
             elif solver_id == "Exact ILP":
-                solver_res = self.ilp_solver.solve(
-                    landscape=solver_landscape,
-                )
+                solver_result = self.ilp_solver.solve(solver_landscape)
             else:
                 raise ValueError(f"Unknown solver_id: {solver_id}")
 
-            X_opt = solver_res.X.clone()
-
-            # 4. Pure Evaluations
-            internal_E = solver_landscape.evaluate(X_opt)
-            external_E = ground_truth_landscape.evaluate(X_opt)
-
-            reconfig = compute_reconfig_cost(prev_X, X_opt)
-            conflicts = compute_constraint_violations(problem_ctx.C, X_opt)
-            coordination = compute_coordination_score(problem_inst.interaction_graph, X_opt)
-            load_bal = compute_load_balance(X_opt)
-
-            kappa_norm = float(current_landscape_state.kappa.norm().item())
-            theta_diff = (current_landscape_state.Theta - problem_inst.interaction_graph).norm().item()
+            X = solver_result.X.clone()
+            internal_energy = solver_landscape.evaluate(X)
+            external_energy = ground_truth.evaluate(X)
+            kappa_norm = float(current_state.kappa.norm().item())
+            theta_norm = float(current_state.Theta.norm().item())
+            theta_diff_norm = float(
+                (current_state.Theta - problem_inst.interaction_graph).norm().item()
+            )
+            if previous_state is None:
+                delta_kappa = 0.0
+                delta_theta = 0.0
+            else:
+                delta_kappa = float((current_state.kappa - previous_state.kappa).norm().item())
+                delta_theta = float((current_state.Theta - previous_state.Theta).norm().item())
+            state_snapshots[episode] = current_state.clone()
 
             records.append(
                 EpisodeRecord(
-                    episode=ep,
-                    internal_energy=internal_E,
-                    external_energy=external_E,
-                    energy_evaluations=solver_res.energy_evaluations,
-                    accepted_moves=solver_res.accepted_moves,
-                    iterations=solver_res.iterations,
-                    runtime_sec=solver_res.runtime_sec,
-                    termination_reason=solver_res.termination_reason,
-                    solver_status=solver_res.status,
-                    is_optimal=solver_res.is_optimal,
-                    mip_gap=solver_res.mip_gap,
-                    timeout=solver_res.timeout,
-                    fallback_used=solver_res.fallback_used,
-                    reconfig_cost=reconfig,
-                    constraint_violations=conflicts,
-                    coordination_score=coordination,
-                    load_balance=load_bal,
+                    episode=episode,
+                    internal_energy=internal_energy,
+                    external_energy=external_energy,
+                    energy_evaluations=solver_result.energy_evaluations,
+                    accepted_moves=solver_result.accepted_moves,
+                    iterations=solver_result.iterations,
+                    runtime_sec=solver_result.runtime_sec,
+                    termination_reason=solver_result.termination_reason,
+                    solver_status=solver_result.status,
+                    is_optimal=solver_result.is_optimal,
+                    mip_gap=solver_result.mip_gap,
+                    timeout=solver_result.timeout,
+                    fallback_used=solver_result.fallback_used,
+                    reconfig_cost=compute_reconfig_cost(previous_X, X),
+                    constraint_violations=compute_co_assignment_conflicts(context.C, X),
+                    coordination_score=compute_coordination_score(
+                        problem_inst.interaction_graph, X
+                    ),
+                    load_balance=compute_load_balance(X),
                     kappa_norm=kappa_norm,
-                    theta_diff_norm=theta_diff,
+                    theta_diff_norm=theta_diff_norm,
+                    delta_kappa_norm=delta_kappa,
+                    delta_theta_norm=delta_theta,
+                    theta_norm=theta_norm,
                 )
             )
 
-            # 5. Explicit Episode Boundary Adaptation
-            # STRICTLY from current episode data only — no future trajectory access
-            current_landscape_state = adaptation_mgr.step(
-                current_state=current_landscape_state,
-                X=X_opt,
-                problem=problem_ctx,
-            )
-
-            prev_X = X_opt.clone()
+            # The observation from episode t is applied only after all episode-t metrics.
+            previous_state = current_state.clone()
+            current_state = manager.step(current_state, X, context)
+            previous_X = X
 
         if reference_energy is None:
-            target_ep = min(self.cfg.perturb_episode, len(trajectory) - 1)
-            target_inst = trajectory[target_ep]
-            gt_ctx = problem_instance_to_problem_context(
-                target_inst,
-                lambda_align=self.cfg.lambda_align,
-                lambda_memory=self.cfg.lambda_memory,
-                interaction_weight=self.cfg.interaction_weight,
-                cost_weight=self.cfg.cost_weight,
-                risk_weight=self.cfg.risk_weight,
-            )
-            gt_state = LandscapeState(
-                kappa=torch.zeros(N, d, dtype=torch.float32),
-                Theta=target_inst.interaction_graph.clone(),
-            )
-            gt_landscape = Landscape(problem=gt_ctx, state=gt_state)
-            ref_sol = self.ilp_solver.solve(gt_landscape)
-            reference_energy = ref_sol.energy
-            reference_method = "exact_optimal" if ref_sol.is_optimal else "ilp_solver_fallback"
+            target = trajectory[min(self.cfg.perturb_episode, len(trajectory) - 1)]
+            reference_energy, reference_method, reference_valid, _ = self._ground_truth_reference(target)
+
+        snapshot_start = self.cfg.perturb_episode
+        snapshot_end = min(
+            self.cfg.perturb_episode + self.cfg.post_ppee_window,
+            len(trajectory) - 1,
+        )
+        kappa_change = theta_change = None
+        if snapshot_start < len(trajectory) and snapshot_end >= snapshot_start:
+            start_state = state_snapshots[snapshot_start]
+            end_state = state_snapshots[snapshot_end]
+            kappa_change = float((end_state.kappa - start_state.kappa).norm().item())
+            theta_change = float((end_state.Theta - start_state.Theta).norm().item())
 
         summary = compute_trajectory_summary(
             records=records,
@@ -228,55 +245,44 @@ class ControlledBenchmarkRunner:
             perturb_episode=self.cfg.perturb_episode,
             pre_window=self.cfg.pre_window,
             post_window=self.cfg.post_window,
+            post_ppee_window=self.cfg.post_ppee_window,
             reference_energy=reference_energy,
             reference_method=reference_method,
+            kappa_change_post=kappa_change,
+            theta_change_post=theta_change,
         )
         return summary, records
 
-    def run_benchmark(self) -> Dict[str, Any]:
-        """
-        Run the complete controlled experimental matrix across scenarios, solvers, and seeds.
-        """
-        start_benchmark_time = time.time()
-        print("=" * 80)
-        print(f"STARTING CONTROLLED LANDSCAPE x SOLVER BENCHMARK (Mode: {self.cfg.mode})")
-        print(f"Seeds: {self.cfg.seeds} | Budget: {self.cfg.max_energy_evaluations} evals | Episodes: {self.cfg.num_episodes}")
-        print("=" * 80)
-
-        os.makedirs(self.cfg.output_dir, exist_ok=True)
-        self.cfg.save_json(os.path.join(self.cfg.output_dir, "config.json"))
-
-        run_records: List[Dict[str, Any]] = []
-
-        # Define experimental cells
-        # Primary Matrix:
-        #   (SA, Static), (SA, Adaptive Full)
-        #   (Greedy, Static), (Greedy, Adaptive Full)
-        #   (ILP, Static), (ILP, Adaptive Full) [if run_ilp_dynamic or small scale]
-        # Ablations (for SA):
-        #   (SA, kappa-only), (SA, theta-only)
+    def _cells(self) -> List[Tuple[str, str, str]]:
         cells = [
             ("Simulated Annealing", "Static", "static"),
-            ("Simulated Annealing", "Adaptive Full", "full"),
-            ("Simulated Annealing", "kappa-only", "kappa-only"),
-            ("Simulated Annealing", "theta-only", "theta-only"),
+            ("Simulated Annealing", "Kappa-only", "kappa-only"),
+            ("Simulated Annealing", "Theta-only", "theta-only"),
+            ("Simulated Annealing", "Full", "full"),
             ("Energy Greedy", "Static", "static"),
-            ("Energy Greedy", "Adaptive Full", "full"),
+            ("Energy Greedy", "Kappa-only", "kappa-only"),
+            ("Energy Greedy", "Theta-only", "theta-only"),
+            ("Energy Greedy", "Full", "full"),
         ]
-
         if self.cfg.run_ilp_dynamic:
-            cells.extend([
-                ("Exact ILP", "Static", "static"),
-                ("Exact ILP", "Adaptive Full", "full"),
-            ])
+            cells.extend(
+                [
+                    ("Exact ILP", "Static", "static"),
+                    ("Exact ILP", "Full", "full"),
+                ]
+            )
+        return cells
 
-        total_runs = len(self.cfg.scenarios) * len(self.cfg.seeds) * len(cells)
-        current_run_idx = 0
+    def run_benchmark(self) -> Dict[str, Any]:
+        started = time.time()
+        os.makedirs(self.cfg.output_dir, exist_ok=True)
+        self.cfg.save_json(os.path.join(self.cfg.output_dir, "config.json"))
+        cells = self._cells()
+        runs: List[Dict[str, Any]] = []
+        episodes: List[Dict[str, Any]] = []
 
         for scenario_id in self.cfg.scenarios:
-            print(f"\n>>> Scenario: {scenario_id} <<<")
             for seed in self.cfg.seeds:
-                # 1. Pre-generate identical trajectory for this (scenario, seed)
                 trajectory = generate_scenario_trajectory(
                     scenario_id=scenario_id,
                     seed=seed,
@@ -286,52 +292,41 @@ class ControlledBenchmarkRunner:
                     M=self.cfg.num_tasks,
                     d=self.cfg.dim,
                 )
-
-                problem_id = f"{scenario_id}_N{self.cfg.num_agents}_M{self.cfg.num_tasks}_seed{seed}"
-
-                # Compute solver-independent reference energy ONCE per (scenario, seed)
-                target_ep = min(self.cfg.perturb_episode, len(trajectory) - 1)
-                target_inst = trajectory[target_ep]
-                ref_ctx = problem_instance_to_problem_context(
-                    target_inst,
-                    lambda_align=self.cfg.lambda_align,
-                    lambda_memory=self.cfg.lambda_memory,
-                    interaction_weight=self.cfg.interaction_weight,
-                    cost_weight=self.cfg.cost_weight,
-                    risk_weight=self.cfg.risk_weight,
+                trajectory_id = _trajectory_fingerprint(trajectory)
+                target = trajectory[min(self.cfg.perturb_episode, len(trajectory) - 1)]
+                reference_energy, reference_method, reference_valid, reference_timeout = (
+                    self._ground_truth_reference(target)
                 )
-                ref_state = LandscapeState(
-                    kappa=torch.zeros(self.cfg.num_agents, self.cfg.dim, dtype=torch.float32),
-                    Theta=target_inst.interaction_graph.clone(),
-                )
-                ref_landscape = Landscape(problem=ref_ctx, state=ref_state)
-                ref_sol = self.ilp_solver.solve(ref_landscape)
-                ref_energy = ref_sol.energy
-                ref_method = "exact_optimal" if ref_sol.is_optimal else "ilp_solver_fallback"
+                reference_id = hashlib.sha256(
+                    f"{scenario_id}|{seed}|{reference_energy:.12g}".encode()
+                ).hexdigest()
 
-                for solver_id, landscape_id, adapt_mode in cells:
-                    current_run_idx += 1
-                    run_id = f"run_{scenario_id[:4].lower()}_s{seed}_{solver_id[:2].lower()}_{adapt_mode[:4]}"
-
-                    summary, ep_records = self.run_trajectory(
+                for solver_id, landscape_id, adaptation_mode in cells:
+                    run_id = "run_{}_{}_{}_{}_{}".format(
+                        _slug(scenario_id), seed, _slug(solver_id), _slug(adaptation_mode), self.cfg.experiment_id
+                    )
+                    summary, episode_records = self.run_trajectory(
                         scenario_id=scenario_id,
                         seed=seed,
                         solver_id=solver_id,
                         landscape_id=landscape_id,
-                        adaptation_mode=adapt_mode,
+                        adaptation_mode=adaptation_mode,
                         trajectory=trajectory,
-                        reference_energy=ref_energy,
-                        reference_method=ref_method,
+                        reference_energy=reference_energy,
+                        reference_method=reference_method,
+                        reference_valid=reference_valid,
                     )
-
-                    rec = {
+                    run = {
                         "run_id": run_id,
-                        "problem_id": problem_id,
+                        "experiment_id": self.cfg.experiment_id,
+                        "problem_id": f"{scenario_id}_N{self.cfg.num_agents}_M{self.cfg.num_tasks}_seed{seed}",
+                        "trajectory_id": trajectory_id,
+                        "reference_id": reference_id,
                         "scenario_id": scenario_id,
                         "seed": seed,
                         "solver_id": solver_id,
                         "landscape_id": landscape_id,
-                        "adaptation_mode": adapt_mode,
+                        "adaptation_mode": adaptation_mode,
                         "N": self.cfg.num_agents,
                         "M": self.cfg.num_tasks,
                         "d": self.cfg.dim,
@@ -339,18 +334,26 @@ class ControlledBenchmarkRunner:
                         "perturb_episode": self.cfg.perturb_episode,
                         "evaluation_budget": self.cfg.max_energy_evaluations,
                         "max_energy_evaluations": self.cfg.max_energy_evaluations,
-                        "recovery_time": summary.recovery_time,
-                        "perf_drop": summary.perf_drop,
+                        "ppee_10": summary.ppee_10,
+                        "cumulative_excess_energy": summary.cumulative_excess_energy,
                         "cumulative_regret": summary.cumulative_regret,
-                        "pre_base_energy": summary.pre_base_energy,
-                        "post_base_energy": summary.post_base_energy,
-                        "final_energy": summary.final_energy,
+                        "performance_drop": summary.perf_drop,
+                        "perf_drop": summary.perf_drop,
+                        "recovery_time": summary.recovery_time,
                         "mean_external_energy": summary.mean_external_energy,
                         "mean_internal_energy": summary.mean_internal_energy,
+                        "final_energy": summary.final_energy,
+                        "pre_base_energy": summary.pre_base_energy,
+                        "post_base_energy": summary.post_base_energy,
                         "convergence": summary.convergence,
                         "stability": summary.stability,
+                        "kappa_norm": summary.adaptation_magnitude_kappa,
+                        "theta_norm": summary.adaptation_magnitude_theta,
                         "adaptation_magnitude_kappa": summary.adaptation_magnitude_kappa,
                         "adaptation_magnitude_theta": summary.adaptation_magnitude_theta,
+                        "kappa_change_post": summary.kappa_change_post,
+                        "theta_change_post": summary.theta_change_post,
+                        "mean_co_assignment_conflicts": summary.mean_co_assignment_conflicts,
                         "mean_constraint_violations": summary.mean_constraint_violations,
                         "total_energy_evaluations": summary.total_energy_evaluations,
                         "total_runtime_sec": summary.total_runtime_sec,
@@ -358,257 +361,291 @@ class ControlledBenchmarkRunner:
                         "all_episodes_optimal": summary.all_episodes_optimal,
                         "fallback_used": summary.fallback_used,
                         "recovery_threshold": summary.recovery_threshold,
-                        "reference_energy": summary.reference_energy,
-                        "reference_method": summary.reference_method,
+                        "reference_energy": reference_energy,
+                        "reference_method": reference_method,
+                        "reference_valid": reference_valid,
+                        "reference_timeout": reference_timeout,
                         "recovery_window": summary.recovery_window,
                         "evaluation_landscape_id": summary.evaluation_landscape_id,
                         "git_commit": self.cfg.git_commit,
                         "benchmark_version": self.cfg.benchmark_version,
                     }
-                    run_records.append(rec)
+                    runs.append(run)
+                    for record in episode_records:
+                        episodes.append(
+                            {
+                                "run_id": run_id,
+                                "experiment_id": self.cfg.experiment_id,
+                                "problem_id": run["problem_id"],
+                                "trajectory_id": trajectory_id,
+                                "reference_id": reference_id,
+                                "scenario_id": scenario_id,
+                                "seed": seed,
+                                "solver_id": solver_id,
+                                "landscape_id": landscape_id,
+                                "adaptation_mode": adaptation_mode,
+                                "N": self.cfg.num_agents,
+                                "M": self.cfg.num_tasks,
+                                "d": self.cfg.dim,
+                                "total_episodes": self.cfg.num_episodes,
+                                "perturb_episode": self.cfg.perturb_episode,
+                                "episode": record.episode,
+                                "evaluation_budget": self.cfg.max_energy_evaluations,
+                                "reference_method": reference_method,
+                                "reference_energy": reference_energy,
+                                "reference_valid": reference_valid,
+                                "internal_energy": record.internal_energy,
+                                "external_energy": record.external_energy,
+                                "energy_evaluations": record.energy_evaluations,
+                                "accepted_moves": record.accepted_moves,
+                                "iterations": record.iterations,
+                                "runtime_sec": record.runtime_sec,
+                                "termination_reason": record.termination_reason,
+                                "solver_status": record.solver_status,
+                                "optimal": record.is_optimal,
+                                "mip_gap": record.mip_gap,
+                                "timeout": record.timeout,
+                                "fallback": record.fallback_used,
+                                "reconfig_cost": record.reconfig_cost,
+                                "co_assignment_conflicts": record.constraint_violations,
+                                "coordination_score": record.coordination_score,
+                                "load_balance": record.load_balance,
+                                "kappa_norm": record.kappa_norm,
+                                "theta_norm": record.theta_norm,
+                                "theta_diff_norm": record.theta_diff_norm,
+                                "delta_kappa_norm": record.delta_kappa_norm,
+                                "delta_theta_norm": record.delta_theta_norm,
+                                "git_commit": self.cfg.git_commit,
+                            }
+                        )
 
-                    print(
-                        f"  [{current_run_idx:03d}/{total_runs:03d}] "
-                        f"Seed={seed:2d} | {solver_id:19s} | {landscape_id:13s} -> "
-                        f"RecovTime: {summary.recovery_time:4.1f} | "
-                        f"MeanExtE: {summary.mean_external_energy:7.3f} | "
-                        f"Regret: {summary.cumulative_regret:7.2f} | "
-                        f"Runtime: {summary.total_runtime_sec*1000:6.1f}ms"
-                    )
+        runs_df = pd.DataFrame(runs)
+        episodes_df = pd.DataFrame(episodes)
+        runs_df.to_csv(os.path.join(self.cfg.output_dir, "runs.csv"), index=False)
+        episodes_df.to_csv(os.path.join(self.cfg.output_dir, "episodes.csv"), index=False)
 
-        # Convert to DataFrame
-        runs_df = pd.DataFrame(run_records)
-        runs_csv_path = os.path.join(self.cfg.output_dir, "runs.csv")
-        runs_df.to_csv(runs_csv_path, index=False)
-        print(f"\nWrote runs table to {runs_csv_path}")
-
-        # Compute Summary Table
-        summary_cols = [
+        summary_metrics = [
+            "ppee_10",
+            "cumulative_excess_energy",
+            "performance_drop",
             "recovery_time",
-            "perf_drop",
-            "cumulative_regret",
-            "pre_base_energy",
-            "post_base_energy",
-            "mean_external_energy",
-            "convergence",
-            "stability",
-            "total_energy_evaluations",
+            "kappa_change_post",
+            "theta_change_post",
             "total_runtime_sec",
+            "total_energy_evaluations",
         ]
-        group_cols = ["scenario_id", "solver_id", "landscape_id", "adaptation_mode"]
-        summary_df = runs_df.groupby(group_cols)[summary_cols].agg(["mean", "std", "count"]).reset_index()
-        summary_csv_path = os.path.join(self.cfg.output_dir, "summary.csv")
-        summary_df.to_csv(summary_csv_path, index=False)
-        print(f"Wrote aggregated summary to {summary_csv_path}")
+        group_cols = ["scenario_id", "solver_id", "adaptation_mode"]
+        summary_df = runs_df.groupby(group_cols, dropna=False).agg(
+            ppee_10_mean=("ppee_10", "mean"),
+            ppee_10_median=("ppee_10", "median"),
+            ppee_10_std=("ppee_10", "std"),
+            cumulative_excess_energy_mean=("cumulative_excess_energy", "mean"),
+            cumulative_excess_energy_median=("cumulative_excess_energy", "median"),
+            performance_drop_mean=("performance_drop", "mean"),
+            recovery_time_mean=("recovery_time", "mean"),
+            kappa_change_post_mean=("kappa_change_post", "mean"),
+            theta_change_post_mean=("theta_change_post", "mean"),
+            runtime_sec_mean=("total_runtime_sec", "mean"),
+            energy_evaluations_mean=("total_energy_evaluations", "mean"),
+            n=("ppee_10", "count"),
+        ).reset_index()
+        summary_df.to_csv(os.path.join(self.cfg.output_dir, "summary.csv"), index=False)
 
-        # Compute Rigorous Paired Statistics
-        stats_records = self._compute_paired_statistics(runs_df)
-        stats_df = pd.DataFrame(stats_records)
-        stats_csv_path = os.path.join(self.cfg.output_dir, "statistics.csv")
-        stats_df.to_csv(stats_csv_path, index=False)
-        print(f"Wrote paired statistical tests to {stats_csv_path}")
+        stats_df = pd.DataFrame(self._compute_paired_statistics(runs_df))
+        stats_df.to_csv(os.path.join(self.cfg.output_dir, "statistics.csv"), index=False)
 
-        # Generate README.md in results directory
-        readme_path = os.path.join(self.cfg.output_dir, "README.md")
-        self._write_results_readme(readme_path, runs_df, stats_df, time.time() - start_benchmark_time)
-        print(f"Wrote report to {readme_path}")
+        integrity = self._integrity_report(runs_df, episodes_df, cells)
+        with open(os.path.join(self.cfg.output_dir, "integrity.json"), "w", encoding="utf-8") as handle:
+            json.dump(integrity, handle, indent=2)
 
-        print("\n" + "=" * 80)
-        print("BENCHMARK RUN COMPLETED SUCCESSFULLY.")
-        print("=" * 80)
-
+        metadata = self._build_metadata(time.time() - started)
+        with open(os.path.join(self.cfg.output_dir, "metadata.json"), "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle, indent=2)
+        self._write_results_readme(os.path.join(self.cfg.output_dir, "README.md"), integrity)
         return {
             "runs_df": runs_df,
+            "episodes_df": episodes_df,
             "summary_df": summary_df,
             "stats_df": stats_df,
+            "integrity": integrity,
             "output_dir": self.cfg.output_dir,
         }
 
+    def _integrity_report(
+        self, runs_df: pd.DataFrame, episodes_df: pd.DataFrame, cells: List[Tuple[str, str, str]]
+    ) -> Dict[str, Any]:
+        expected_runs = len(self.cfg.seeds) * len(self.cfg.scenarios) * len(cells)
+        run_key = ["seed", "scenario_id", "solver_id", "adaptation_mode"]
+        duplicates = int(runs_df.duplicated(run_key).sum()) if len(runs_df) else 0
+        episode_counts = episodes_df.groupby("run_id")["episode"].nunique() if len(episodes_df) else pd.Series(dtype=int)
+        expected_episode_set = set(range(self.cfg.num_episodes))
+        missing_episode_runs = [
+            run_id for run_id, count in episode_counts.items()
+            if count != self.cfg.num_episodes
+            or set(episodes_df.loc[episodes_df.run_id == run_id, "episode"]) != expected_episode_set
+        ]
+        primary = ["ppee_10", "cumulative_excess_energy", "reference_energy"]
+        finite = bool(np.isfinite(runs_df[primary].to_numpy(dtype=float)).all()) if len(runs_df) else False
+        references_shared = (
+            runs_df.groupby(["scenario_id", "seed"])["reference_id"].nunique().max() <= 1
+            if len(runs_df) else False
+        )
+        trajectories_shared = (
+            runs_df.groupby(["scenario_id", "seed"])["trajectory_id"].nunique().max() <= 1
+            if len(runs_df) else False
+        )
+        return {
+            "expected_runs": expected_runs,
+            "actual_runs": int(len(runs_df)),
+            "run_count_ok": len(runs_df) == expected_runs,
+            "duplicate_run_keys": duplicates,
+            "duplicate_keys_ok": duplicates == 0,
+            "episodes_per_run": self.cfg.num_episodes,
+            "runs_with_missing_or_duplicate_episodes": missing_episode_runs,
+            "episode_completeness_ok": not missing_episode_runs,
+            "ppee_window": list(range(
+                self.cfg.perturb_episode,
+                min(self.cfg.perturb_episode + self.cfg.post_ppee_window, self.cfg.num_episodes),
+            )),
+            "references_shared": bool(references_shared),
+            "trajectories_shared": bool(trajectories_shared),
+            "finite_primary_values": finite,
+            "invalid_reference_runs": int((~runs_df["reference_valid"].astype(bool)).sum()) if len(runs_df) else 0,
+            "all_checks_pass": bool(
+                len(runs_df) == expected_runs
+                and duplicates == 0
+                and not missing_episode_runs
+                and finite
+                and references_shared
+                and trajectories_shared
+                and (int((~runs_df["reference_valid"].astype(bool)).sum()) == 0 if len(runs_df) else False)
+            ),
+        }
+
     def _compute_paired_statistics(self, runs_df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """
-        Compute paired statistical tests strictly matched on (problem_id, scenario_id, seed).
-
-        Hypothesis families (Holm-Bonferroni applied WITHIN each family):
-          Family 1 — PRIMARY: Adaptive Full vs Static on recovery_time.
-          Family 2 — SECONDARY: Adaptive Full vs Static on mean_external_energy, cumulative_regret.
-          Family 3 — ABLATION: SA kappa-only/theta-only vs Static.
-          Family 4 — SOLVER INTERACTION: Adaptive advantage SA vs Adaptive advantage Greedy.
-        """
-        # Collect rows per family
-        family1: List[Dict[str, Any]] = []
-        family2: List[Dict[str, Any]] = []
-        family3: List[Dict[str, Any]] = []
-        family4: List[Dict[str, Any]] = []
-
-        for scenario_id in self.cfg.scenarios:
-            scen_df = runs_df[runs_df["scenario_id"] == scenario_id]
-
-            # --- Family 1 & 2: Primary matrix adaptive vs static ---
-            for solver_id in ["Simulated Annealing", "Energy Greedy"]:
-                adapt_df = scen_df[(scen_df["solver_id"] == solver_id) & (scen_df["adaptation_mode"] == "full")]
-                stat_df = scen_df[(scen_df["solver_id"] == solver_id) & (scen_df["adaptation_mode"] == "static")]
-
-                merged = pd.merge(adapt_df, stat_df, on="seed", suffixes=("_adapt", "_stat"))
-                if len(merged) == 0:
-                    continue
-
-                # Family 1: PRIMARY — recovery_time
-                a_vals = merged["recovery_time_adapt"].tolist()
-                s_vals = merged["recovery_time_stat"].tolist()
-                res = analyze_paired_comparison(a_vals, s_vals, "recovery_time", f"{solver_id}: Adaptive Full - Static")
-                row = asdict(res)
-                row["scenario_id"] = scenario_id
-                row["solver_id"] = solver_id
-                row["hypothesis_family"] = "Family 1: PRIMARY"
-                family1.append(row)
-
-                # Family 2: SECONDARY — mean_external_energy and cumulative_regret
-                for metric in ["mean_external_energy", "cumulative_regret"]:
-                    a_vals = merged[f"{metric}_adapt"].tolist()
-                    s_vals = merged[f"{metric}_stat"].tolist()
-                    res = analyze_paired_comparison(a_vals, s_vals, metric, f"{solver_id}: Adaptive Full - Static")
-                    row = asdict(res)
-                    row["scenario_id"] = scenario_id
-                    row["solver_id"] = solver_id
-                    row["hypothesis_family"] = "Family 2: SECONDARY"
-                    family2.append(row)
-
-            # --- Family 3: ABLATION — kappa-only and theta-only vs static for SA ---
-            for abl_mode in ["kappa-only", "theta-only"]:
-                abl_df = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == abl_mode)]
-                stat_df = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "static")]
-                merged = pd.merge(abl_df, stat_df, on="seed", suffixes=("_abl", "_stat"))
-                if len(merged) == 0:
-                    continue
-
-                for metric in ["recovery_time", "mean_external_energy", "cumulative_regret"]:
-                    a_vals = merged[f"{metric}_abl"].tolist()
-                    s_vals = merged[f"{metric}_stat"].tolist()
-                    res = analyze_paired_comparison(a_vals, s_vals, metric, f"SA Ablation ({abl_mode}) - Static")
-                    row = asdict(res)
-                    row["scenario_id"] = scenario_id
-                    row["solver_id"] = "Simulated Annealing"
-                    row["hypothesis_family"] = "Family 3: ABLATION"
-                    family3.append(row)
-
-            # --- Family 4: SOLVER INTERACTION ---
-            sa_adapt = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "full")]
-            sa_stat = scen_df[(scen_df["solver_id"] == "Simulated Annealing") & (scen_df["adaptation_mode"] == "static")]
-            gr_adapt = scen_df[(scen_df["solver_id"] == "Energy Greedy") & (scen_df["adaptation_mode"] == "full")]
-            gr_stat = scen_df[(scen_df["solver_id"] == "Energy Greedy") & (scen_df["adaptation_mode"] == "static")]
-
-            m_sa = pd.merge(sa_adapt, sa_stat, on="seed", suffixes=("_adapt", "_stat"))
-            m_gr = pd.merge(gr_adapt, gr_stat, on="seed", suffixes=("_adapt", "_stat"))
-            m_both = pd.merge(m_sa, m_gr, on="seed", suffixes=("_sa", "_gr"))
-
-            if len(m_both) >= 2:
-                for metric in ["recovery_time", "mean_external_energy", "cumulative_regret"]:
-                    inter_res = analyze_solver_interaction(
-                        sa_adaptive=m_both[f"{metric}_adapt_sa"].tolist(),
-                        sa_static=m_both[f"{metric}_stat_sa"].tolist(),
-                        greedy_adaptive=m_both[f"{metric}_adapt_gr"].tolist(),
-                        greedy_static=m_both[f"{metric}_stat_gr"].tolist(),
-                        metric_name=metric,
+        families: Dict[str, List[Dict[str, Any]]] = {
+            "primary": [], "secondary": [], "ablation": [], "interaction": []
+        }
+        pair_keys = ["problem_id", "scenario_id", "seed"]
+        for scenario in self.cfg.scenarios:
+            scoped = runs_df[runs_df.scenario_id == scenario]
+            for solver in ["Simulated Annealing", "Energy Greedy"]:
+                full = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == "full")]
+                static = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == "static")]
+                merged = pd.merge(full, static, on=pair_keys, suffixes=("_full", "_static"))
+                if len(merged):
+                    result = analyze_paired_comparison(
+                        merged.ppee_10_full.tolist(), merged.ppee_10_static.tolist(),
+                        "ppee_10", f"{solver}: Full - Static"
                     )
-                    family4.append({
+                    row = asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 1: PRIMARY"}
+                    families["primary"].append(row)
+                    for metric in ["cumulative_excess_energy", "performance_drop", "recovery_time"]:
+                        result = analyze_paired_comparison(
+                            merged[f"{metric}_full"].tolist(), merged[f"{metric}_static"].tolist(),
+                            metric, f"{solver}: Full - Static"
+                        )
+                        families["secondary"].append(
+                            asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 2: SECONDARY"}
+                        )
+                for mode in ["kappa-only", "theta-only"]:
+                    ablation = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == mode)]
+                    merged = pd.merge(ablation, static, on=pair_keys, suffixes=("_abl", "_static"))
+                    if len(merged):
+                        for metric in ["ppee_10", "cumulative_excess_energy"]:
+                            result = analyze_paired_comparison(
+                                merged[f"{metric}_abl"].tolist(), merged[f"{metric}_static"].tolist(),
+                                metric, f"{solver}: {mode} - Static"
+                            )
+                            families["ablation"].append(
+                                asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 3: ABLATION"}
+                            )
+
+            sa_full = scoped[(scoped.solver_id == "Simulated Annealing") & (scoped.adaptation_mode == "full")]
+            sa_static = scoped[(scoped.solver_id == "Simulated Annealing") & (scoped.adaptation_mode == "static")]
+            gr_full = scoped[(scoped.solver_id == "Energy Greedy") & (scoped.adaptation_mode == "full")]
+            gr_static = scoped[(scoped.solver_id == "Energy Greedy") & (scoped.adaptation_mode == "static")]
+            sa = pd.merge(sa_full, sa_static, on=pair_keys, suffixes=("_full", "_static"))
+            gr = pd.merge(gr_full, gr_static, on=pair_keys, suffixes=("_full", "_static"))
+            both = pd.merge(sa, gr, on=pair_keys, suffixes=("_sa", "_greedy"))
+            if len(both):
+                for metric in ["ppee_10", "cumulative_excess_energy"]:
+                    result = analyze_solver_interaction(
+                        both[f"{metric}_full_sa"].tolist(), both[f"{metric}_static_sa"].tolist(),
+                        both[f"{metric}_full_greedy"].tolist(), both[f"{metric}_static_greedy"].tolist(), metric
+                    )
+                    families["interaction"].append({
                         "metric": metric,
-                        "comparison": "Solver Interaction (SA vs Greedy)",
-                        "scenario_id": scenario_id,
+                        "comparison": "Solver interaction (SA vs Greedy)",
+                        "scenario_id": scenario,
                         "solver_id": "Interaction",
                         "hypothesis_family": "Family 4: SOLVER INTERACTION",
-                        "n_pairs": inter_res.n_pairs,
-                        "mean_adaptive": inter_res.mean_sa_diff,
-                        "mean_static": inter_res.mean_greedy_diff,
-                        "mean_difference": inter_res.mean_interaction,
-                        "median_difference": inter_res.median_interaction,
-                        "ci_95_lower": inter_res.ci_95_lower,
-                        "ci_95_upper": inter_res.ci_95_upper,
-                        "permutation_p_val": inter_res.permutation_p_val,
+                        "n_pairs": result.n_pairs,
+                        "mean_adaptive": result.mean_sa_diff,
+                        "mean_static": result.mean_greedy_diff,
+                        "mean_difference": result.mean_interaction,
+                        "median_difference": result.median_interaction,
+                        "ci_95_lower": result.ci_95_lower,
+                        "ci_95_upper": result.ci_95_upper,
+                        "permutation_p_val": result.permutation_p_val,
                         "wilcoxon_p_val": 1.0,
-                        "cohens_d": inter_res.cohens_d,
-                        "p_val_adjusted": None,
+                        "cohens_d": result.cohens_d,
                     })
 
-        # Apply Holm-Bonferroni WITHIN each family (not globally)
-        def apply_holm_within_family(rows: List[Dict[str, Any]]) -> None:
-            if not rows:
-                return
-            raw_p = [r["permutation_p_val"] for r in rows]
-            adj_p = holm_bonferroni_correction(raw_p)
-            for row, adj in zip(rows, adj_p):
-                row["p_val_adjusted"] = adj
+        output: List[Dict[str, Any]] = []
+        for name, rows in families.items():
+            if rows:
+                adjusted = holm_bonferroni_correction([row["permutation_p_val"] for row in rows])
+                for row, value in zip(rows, adjusted):
+                    row["p_val_adjusted"] = value
+            output.extend(rows)
+        return output
 
-        apply_holm_within_family(family1)
-        apply_holm_within_family(family2)
-        apply_holm_within_family(family3)
-        apply_holm_within_family(family4)
+    def _build_metadata(self, runtime: float) -> Dict[str, Any]:
+        return {
+            "experiment_id": self.cfg.experiment_id,
+            "benchmark_version": self.cfg.benchmark_version,
+            "git_commit": self.cfg.git_commit,
+            "git_dirty": _get_git_dirty(),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "python_version": sys.version,
+            "platform": platform.platform(),
+            "N": self.cfg.num_agents,
+            "M": self.cfg.num_tasks,
+            "d": self.cfg.dim,
+            "episodes": self.cfg.num_episodes,
+            "perturb_episode": self.cfg.perturb_episode,
+            "evaluation_budget": self.cfg.max_energy_evaluations,
+            "seeds": self.cfg.seeds,
+            "scenarios": self.cfg.scenarios,
+            "solvers": self.cfg.solvers,
+            "adaptations": self.cfg.ablations,
+            "reference_method": "ground_truth_exact_ilp_when_optimal",
+            "post_ppee_window": self.cfg.post_ppee_window,
+            "ppee_definition": "mean(max(0, external_energy - reference_energy)) over the first post-ppee_window episodes",
+            "cee_definition": "sum(max(0, external_energy - reference_energy)) over all post-perturbation episodes",
+            "current_problem_observed": True,
+            "no_hidden_change_detection": True,
+            "no_warm_start": True,
+            "deterministic_initialization": self.cfg.initial_x_mode,
+            "total_runtime_sec": runtime,
+        }
 
-        return family1 + family2 + family3 + family4
+    def _write_results_readme(self, path: str, integrity: Dict[str, Any]) -> None:
+        content = f"""# Controlled Landscape × Solver Benchmark
 
-    def _write_results_readme(
-        self,
-        filepath: str,
-        runs_df: pd.DataFrame,
-        stats_df: pd.DataFrame,
-        total_time_sec: float,
-    ) -> None:
-        """Generate comprehensive, user-facing markdown report."""
-        content = f"""# Controlled Landscape × Solver Benchmark Results
+Experiment identifier: `{self.cfg.experiment_id}`
+Git commit: `{self.cfg.git_commit}`
 
-**Benchmark Version:** {self.cfg.benchmark_version}  
-**Git Commit:** `{self.cfg.git_commit}`  
-**Mode:** {self.cfg.mode}  
-**Execution Runtime:** {total_time_sec:.2f} seconds  
+The current problem instance is directly observed by the solver in every episode; adaptation is historical landscape information, not hidden change detection. Every episode starts from the same deterministic initialization policy and does not warm-start from the previous solution.
 
----
+Primary metric: `ppee_10`, based exclusively on external ground-truth energy and the shared post-perturbation ILP reference. Lower energy is better; adaptive-minus-static differences below zero are improvements.
 
-## 1. Experimental Setup & Fairness Controls
+## Integrity checks
 
-- **Evaluated Scenarios:** {", ".join(self.cfg.scenarios)}
-- **Evaluated Solvers:** {", ".join(self.cfg.solvers)}
-- **Evaluated Landscapes:** {", ".join(self.cfg.landscapes)}
-- **Evaluated Ablations (SA):** {", ".join(self.cfg.ablations)}
-- **Seeds ({len(self.cfg.seeds)}):** `{self.cfg.seeds}`
-- **Common Budget:** `{self.cfg.max_energy_evaluations}` calls to `Landscape.evaluate(X)`
-- **Problem Dimensions:** N={self.cfg.num_agents}, M={self.cfg.num_tasks}, d={self.cfg.dim}
-- **Horizon & Perturbation:** {self.cfg.num_episodes} episodes, perturbation at episode {self.cfg.perturb_episode}
-- **Initial Assignment:** `{self.cfg.initial_x_mode}` (identical starting assignment for all methods)
-- **Primary Metric:** `recovery_time` (formally defined as episodes after perturbation until external energy <= target threshold)
-- **Evaluation Landscape:** `external_ground_truth` (external real environment is source of truth for all recovery and performance metrics)
-
----
-
-## 2. Paired Statistical Findings
-
-The table below summarizes paired comparisons (Adaptive - Static) across matched seeds and trajectories:
-
-| Scenario | Comparison | Metric | Mean Diff | 95% CI | Permutation p-val | Holm Adj p-val | Cohen's d |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+```json
+{json.dumps(integrity, indent=2)}
+```
 """
-        for _, row in stats_df.iterrows():
-            ci_str = f"[{row['ci_95_lower']:+.3f}, {row['ci_95_upper']:+.3f}]"
-            adj_p_str = f"{row['p_val_adjusted']:.4f}" if row.get("p_val_adjusted") is not None else "N/A"
-            content += (
-                f"| {row['scenario_id']} | {row['comparison']} | {row['metric']} | "
-                f"{row['mean_difference']:+.3f} | {ci_str} | {row['permutation_p_val']:.4f} | "
-                f"{adj_p_str} | {row['cohens_d']:+.2f} |\n"
-            )
-
-        content += """
----
-
-## 3. Scientific Interpretation & Hypotheses Testing
-
-1. **Stationary Control Condition:**
-   Evaluates whether unnecessary adaptation degrades performance in a stationary environment.
-2. **Capability Drift:**
-   Evaluates recovery speed and adaptation loss when agent capabilities abruptly change.
-3. **Task Shift:**
-   Evaluates adaptability under systematic shifts in task distribution.
-4. **Dependency Change:**
-   Evaluates adaptation to changing task synergy patterns.
-5. **Solver Independence:**
-   Tested by the Interaction term: whether the effect of the adaptive landscape differs significantly between Simulated Annealing and Energy Greedy.
-"""
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(content)
