@@ -110,18 +110,15 @@ class EpisodeAdaptationManager:
                 co_norm = co / (co_sum + self.epsilon)
                 if self.running_co is None or self.running_co.shape != (M, M):
                     self.running_co = co_norm.clone()
-                    old_running = co_norm.clone()
+                    update_signal = torch.zeros_like(current_state.Theta)
                 else:
-                    old_running = self.running_co.clone()
+                    update_signal = co_norm - self.running_co
                     self.running_co = (
                         (1.0 - self.eta_theta) * self.running_co
                         + self.eta_theta * co_norm
                     )
 
-                new_Theta = (
-                    (1.0 - self.eta_theta) * current_state.Theta
-                    + self.eta_theta * (co_norm - old_running)
-                )
+                new_Theta = current_state.Theta + self.eta_theta * update_signal
         else:
             # Static and kappa-only modes: Theta strictly retains Theta_0 across the entire trajectory
             new_Theta = current_state.Theta.clone()

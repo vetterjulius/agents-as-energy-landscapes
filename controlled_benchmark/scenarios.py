@@ -4,7 +4,28 @@ import random
 from typing import List, Tuple
 import torch
 
-from benchmark.scenarios.base import Agent, ProblemInstance, Task
+from dataclasses import dataclass
+
+@dataclass
+class Agent:
+    id: str
+    role: str
+    capability_embedding: torch.Tensor
+
+@dataclass
+class Task:
+    id: str
+    embedding: torch.Tensor
+    estimated_cost: float
+
+@dataclass
+class ProblemInstance:
+    agents: List[Agent]
+    tasks: List[Task]
+    interaction_graph: torch.Tensor
+    co_assignment_costs: torch.Tensor
+    risk_weights: torch.Tensor
+
 from landscape import LandscapeState, ProblemContext
 
 

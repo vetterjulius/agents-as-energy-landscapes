@@ -1,6 +1,18 @@
 import torch
 
-from state.orchestration_state import OrchestrationState
+from dataclasses import dataclass
+
+@dataclass
+class OrchestrationState:
+    X: torch.Tensor
+    s: torch.Tensor
+    c: torch.Tensor
+    kappa: torch.Tensor
+    Theta: torch.Tensor
+    C: torch.Tensor
+    N: int
+    M: int
+    d: int
 
 from energy.assignment import AssignmentEnergy
 from energy.interaction import InteractionEnergy

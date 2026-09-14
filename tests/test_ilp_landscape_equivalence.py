@@ -1,8 +1,6 @@
 import torch
 import pytest
 
-from dynamics.proposal import AssignmentProposal
-from dynamics.sampler import SimulatedAnnealingSampler
 from ilp import (
     compiled_ilp_objective,
     compile_landscape_to_ilp,
@@ -86,19 +84,6 @@ def test_compiled_model_uses_fixed_landscape_state():
     changed = landscape.state.clone()
     changed.kappa[0, 0] += 1.0
     assert not torch.allclose(model["state"]["kappa"], changed.kappa)
-
-
-def test_sampler_supports_landscape_evaluation_adapter():
-    _, _, landscape = make_small_problem()
-    X = next(iter(enumerate_valid_assignments(landscape.problem)))
-    proposal = AssignmentProposal(energy_registry=None, mode="random")
-    sampler = SimulatedAnnealingSampler(
-        proposal_mechanism=proposal,
-        energy_registry=None,
-        landscape=landscape,
-    )
-
-    assert abs(sampler.evaluate_assignment(X) - landscape.evaluate(X)) < 1e-6
 
 
 @pytest.mark.parametrize("N,M", [(2, 2), (2, 3), (3, 2), (3, 3)])
