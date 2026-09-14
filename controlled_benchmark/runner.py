@@ -278,6 +278,13 @@ class ControlledBenchmarkRunner:
         os.makedirs(self.cfg.output_dir, exist_ok=True)
         self.cfg.save_json(os.path.join(self.cfg.output_dir, "config.json"))
         cells = self._cells()
+        expected_runs = len(self.cfg.seeds) * len(self.cfg.scenarios) * len(cells)
+        print(
+            f"[benchmark] starting: {len(self.cfg.seeds)} seeds × "
+            f"{len(self.cfg.scenarios)} scenarios × {len(cells)} conditions "
+            f"= {expected_runs} runs",
+            flush=True,
+        )
         runs: List[Dict[str, Any]] = []
         episodes: List[Dict[str, Any]] = []
 
@@ -300,6 +307,13 @@ class ControlledBenchmarkRunner:
                 reference_id = hashlib.sha256(
                     f"{scenario_id}|{seed}|{reference_energy:.12g}".encode()
                 ).hexdigest()
+
+                print(
+                    f"[benchmark] prepared trajectory: scenario={scenario_id} "
+                    f"seed={seed} reference={reference_energy:.6f} "
+                    f"({reference_method})",
+                    flush=True,
+                )
 
                 for solver_id, landscape_id, adaptation_mode in cells:
                     run_id = "run_{}_{}_{}_{}_{}".format(
@@ -371,6 +385,14 @@ class ControlledBenchmarkRunner:
                         "benchmark_version": self.cfg.benchmark_version,
                     }
                     runs.append(run)
+                    completed_runs = len(runs)
+                    print(
+                        f"[benchmark] [{completed_runs}/{expected_runs}] "
+                        f"scenario={scenario_id} seed={seed} solver={solver_id} "
+                        f"adaptation={adaptation_mode} ppee_10={summary.ppee_10:.6f} "
+                        f"elapsed={time.time() - started:.1f}s",
+                        flush=True,
+                    )
                     for record in episode_records:
                         episodes.append(
                             {
