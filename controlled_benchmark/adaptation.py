@@ -41,11 +41,17 @@ class EpisodeAdaptationManager:
         self.eta_memory = eta_memory
         self.eta_theta = eta_theta
         self.epsilon = epsilon
-        self.running_co: torch.Tensor | None = None
 
     def reset(self) -> None:
         """Reset internal running statistics between independent runs."""
-        self.running_co = None
+        pass
+
+    @staticmethod
+    def _offdiag(A: torch.Tensor) -> torch.Tensor:
+        """Return A with all diagonal elements set to zero."""
+        result = A.clone()
+        result.fill_diagonal_(0.0)
+        return result
 
     def step(
         self,
@@ -102,23 +108,32 @@ class EpisodeAdaptationManager:
             new_kappa = current_state.kappa.clone()
 
         # 2. Structural Dependency (Theta) adaptation update
+        #
+        # New semantics: exponentially smoothed, observation-based co-assignment representation.
+        #
+        #   C = X_t.T @ X_t / (sum(X_t.T @ X_t) + eps)
+        #   C = offdiag((C + C.T) / 2)
+        #   Theta_new = (1 - eta_theta) * Theta_old + eta_theta * C
+        #   Theta_new = offdiag((Theta_new + Theta_new.T) / 2)
+        #
+        # Theta is updated exclusively from the observed assignment X_t.
+        # No running_co baseline. No additive residual/integrator semantics.
         if update_theta:
-            new_Theta = current_state.Theta.clone()
-            co = X.T @ X
+            co = X.T @ X  # shape (M, M)
             co_sum = co.sum().item()
             if co_sum >= self.epsilon:
+                # Normalize, symmetrize, zero diagonal -> observed C_t
                 co_norm = co / (co_sum + self.epsilon)
-                if self.running_co is None or self.running_co.shape != (M, M):
-                    self.running_co = co_norm.clone()
-                    update_signal = torch.zeros_like(current_state.Theta)
-                else:
-                    update_signal = co_norm - self.running_co
-                    self.running_co = (
-                        (1.0 - self.eta_theta) * self.running_co
-                        + self.eta_theta * co_norm
-                    )
+                C = self._offdiag((co_norm + co_norm.T) / 2.0)
 
-                new_Theta = current_state.Theta + self.eta_theta * update_signal
+                # EMA update toward C_t
+                Theta_new = (1.0 - self.eta_theta) * current_state.Theta + self.eta_theta * C
+
+                # Re-symmetrize and zero diagonal
+                new_Theta = self._offdiag((Theta_new + Theta_new.T) / 2.0)
+            else:
+                # No assignments observed: Theta unchanged
+                new_Theta = current_state.Theta.clone()
         else:
             # Static and kappa-only modes: Theta strictly retains Theta_0 across the entire trajectory
             new_Theta = current_state.Theta.clone()
