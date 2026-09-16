@@ -90,6 +90,9 @@ class BenchmarkConfig:
     # Output directory
     output_dir: str = "results/controlled_landscape_solver"
 
+    # Optional comprehensive per-episode mechanism logging (does not affect execution)
+    verbose_diagnostics: bool = False
+
     @classmethod
     def quick_mode(cls, **overrides: Any) -> "BenchmarkConfig":
         """Fast configuration for rapid testing and CI."""

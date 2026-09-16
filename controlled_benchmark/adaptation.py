@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 import torch
 
 from energy.risk import RiskPredictor
@@ -58,6 +58,7 @@ class EpisodeAdaptationManager:
         current_state: LandscapeState,
         X: torch.Tensor,
         problem: ProblemContext,
+        diagnostics: Optional[Dict[str, Any]] = None,
     ) -> LandscapeState:
         """
         Compute explicit episode boundary adaptation from current and past observations only.
@@ -79,6 +80,8 @@ class EpisodeAdaptationManager:
         update_theta = self.mode in ("theta-only", "full")
 
         # 1. Memory (kappa) adaptation update
+        risk_probabilities = torch.zeros(N, M, dtype=current_state.kappa.dtype)
+        kappa_target = torch.zeros_like(current_state.kappa)
         if update_kappa:
             new_kappa = current_state.kappa.clone()
             risk_pred = RiskPredictor(d, W_risk=problem.W_risk)
@@ -90,6 +93,7 @@ class EpisodeAdaptationManager:
             x_feat = torch.cat([s_exp, c_exp, k_exp], dim=-1)
             logits = torch.matmul(x_feat, problem.W_risk).squeeze(-1) / math.sqrt(max(d, 1))
             p = torch.sigmoid(logits)
+            risk_probabilities = p.clone()
 
             for a in range(N):
                 assigned_tasks = (X[a] > 0).nonzero(as_tuple=True)[0]
@@ -97,6 +101,7 @@ class EpisodeAdaptationManager:
                     task_emb = problem.c[assigned_tasks]
                     success_probs = p[a, assigned_tasks].unsqueeze(1)
                     weighted_update = (task_emb * success_probs).mean(dim=0)
+                    kappa_target[a] = weighted_update
                     new_kappa[a] = (
                         (1.0 - self.eta_memory) * current_state.kappa[a]
                         + self.eta_memory * weighted_update
@@ -106,6 +111,13 @@ class EpisodeAdaptationManager:
         else:
             # Static and theta-only modes: kappa strictly retains its current state (starts at kappa_0)
             new_kappa = current_state.kappa.clone()
+            if diagnostics is not None:
+                s_exp = problem.s.unsqueeze(1).expand(-1, M, -1)
+                c_exp = problem.c.unsqueeze(0).expand(N, -1, -1)
+                k_exp = current_state.kappa.unsqueeze(1).expand(-1, M, -1)
+                x_feat = torch.cat([s_exp, c_exp, k_exp], dim=-1)
+                logits = torch.matmul(x_feat, problem.W_risk).squeeze(-1) / math.sqrt(max(d, 1))
+                risk_probabilities = torch.sigmoid(logits)
 
         # 2. Structural Dependency (Theta) adaptation update
         #
@@ -137,6 +149,24 @@ class EpisodeAdaptationManager:
         else:
             # Static and kappa-only modes: Theta strictly retains Theta_0 across the entire trajectory
             new_Theta = current_state.Theta.clone()
+
+        if diagnostics is not None:
+            co = X.T @ X
+            co_sum = co.sum().item()
+            if co_sum >= self.epsilon:
+                co_norm = co / (co_sum + self.epsilon)
+                theta_observation = self._offdiag((co_norm + co_norm.T) / 2.0)
+            else:
+                theta_observation = torch.zeros_like(current_state.Theta)
+            diagnostics.update(
+                {
+                    "kappa_update_active": update_kappa,
+                    "theta_update_active": update_theta,
+                    "risk_probabilities": risk_probabilities.clone(),
+                    "kappa_target": kappa_target.clone(),
+                    "theta_observation": theta_observation.clone(),
+                }
+            )
 
         return LandscapeState(
             kappa=new_kappa,

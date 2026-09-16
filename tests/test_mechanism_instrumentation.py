@@ -18,7 +18,8 @@ from controlled_benchmark.scenarios import (
 
 def test_episode_mechanism_diagnostics_have_expected_shapes_and_are_finite():
     cfg = BenchmarkConfig.quick_mode(
-        seeds=[42], scenarios=["Stationary"], num_episodes=4, perturb_episode=2
+        seeds=[42], scenarios=["Stationary"], num_episodes=4, perturb_episode=2,
+        verbose_diagnostics=True,
     )
     runner = ControlledBenchmarkRunner(cfg)
     trajectory = generate_scenario_trajectory(
@@ -46,7 +47,8 @@ def test_episode_mechanism_diagnostics_have_expected_shapes_and_are_finite():
 
 def test_saved_cooccurrence_is_exact_implementation_from_saved_assignment():
     cfg = BenchmarkConfig.quick_mode(
-        seeds=[42], scenarios=["Stationary"], num_episodes=3, perturb_episode=1
+        seeds=[42], scenarios=["Stationary"], num_episodes=3, perturb_episode=1,
+        verbose_diagnostics=True,
     )
     runner = ControlledBenchmarkRunner(cfg)
     trajectory = generate_scenario_trajectory(
@@ -65,7 +67,8 @@ def test_saved_cooccurrence_is_exact_implementation_from_saved_assignment():
 
 def test_theta_after_is_actual_boundary_update_and_next_episode_theta_before():
     cfg = BenchmarkConfig.quick_mode(
-        seeds=[42], scenarios=["Stationary"], num_episodes=4, perturb_episode=2
+        seeds=[42], scenarios=["Stationary"], num_episodes=4, perturb_episode=2,
+        verbose_diagnostics=True,
     )
     runner = ControlledBenchmarkRunner(cfg)
     trajectory = generate_scenario_trajectory(
@@ -98,10 +101,44 @@ def test_theta_after_is_actual_boundary_update_and_next_episode_theta_before():
             )
 
 
+def test_verbose_trace_does_not_change_solver_results():
+    trajectory = generate_scenario_trajectory(
+        "Capability Drift", 42, 4, 2, 3, 6, 4
+    )
+    plain = ControlledBenchmarkRunner(
+        BenchmarkConfig.quick_mode(
+            seeds=[42], scenarios=["Capability Drift"], num_episodes=4,
+            perturb_episode=2, max_energy_evaluations=20,
+            verbose_diagnostics=False,
+        )
+    )
+    verbose = ControlledBenchmarkRunner(
+        BenchmarkConfig.quick_mode(
+            seeds=[42], scenarios=["Capability Drift"], num_episodes=4,
+            perturb_episode=2, max_energy_evaluations=20,
+            verbose_diagnostics=True,
+        )
+    )
+    _, plain_records = plain.run_trajectory(
+        "Capability Drift", 42, "Simulated Annealing", "Full", "full", trajectory
+    )
+    _, verbose_records = verbose.run_trajectory(
+        "Capability Drift", 42, "Simulated Annealing", "Full", "full", trajectory
+    )
+    assert [record.external_energy for record in plain_records] == pytest.approx(
+        [record.external_energy for record in verbose_records]
+    )
+    assert [record.internal_energy for record in plain_records] == pytest.approx(
+        [record.internal_energy for record in verbose_records]
+    )
+    assert len(verbose.last_mechanism_diagnostics[0]["solver_trace"]) > 0
+
+
 def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_path):
     cfg = BenchmarkConfig.quick_mode(
         seeds=[42], scenarios=["Dependency Change"], num_episodes=3,
-        perturb_episode=1, max_energy_evaluations=20, output_dir=str(tmp_path)
+        perturb_episode=1, max_energy_evaluations=20, output_dir=str(tmp_path),
+        verbose_diagnostics=True,
     )
     result = ControlledBenchmarkRunner(cfg).run_benchmark()
 
@@ -116,12 +153,35 @@ def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_
         assert artifact["theta_before"].shape == (8, 3, 6, 6)
         assert artifact["theta_after"].shape == (8, 3, 6, 6)
         assert artifact["ground_truth_dependency"].shape == (8, 3, 6, 6)
+        assert artifact["initial_assignment"].shape == (8, 3, 3, 6)
+        assert artifact["agent_capabilities"].shape == (8, 3, 3, 4)
+        assert artifact["task_embeddings"].shape == (8, 3, 6, 4)
+        assert artifact["co_assignment_costs"].shape == (8, 3, 6, 6)
+        assert artifact["risk_weights"].shape == (8, 3, 12, 1)
+        assert artifact["kappa_before"].shape == (8, 3, 3, 4)
+        assert artifact["kappa_after"].shape == (8, 3, 3, 4)
+        assert artifact["adaptation_risk_probabilities"].shape == (8, 3, 3, 6)
+        assert artifact["adaptation_kappa_target"].shape == (8, 3, 3, 4)
+        assert artifact["adaptation_theta_observation"].shape == (8, 3, 6, 6)
+        assert "trace_assignment_matrix" in artifact.files
+        assert artifact["trace_assignment_matrix"].shape[1:] == (3, 6)
+        assert artifact["trace_assignment_matrix"].shape[0] > 0
+        assert "internal_energy_AssignmentEnergy" in artifact.files
+        assert "external_energy_RiskEnergy" in artifact.files
         assert np.array_equal(artifact["episode"], np.tile(np.arange(3), (8, 1)))
         for name in artifact.files:
             assert np.isfinite(artifact[name]).all()
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["format_version"] == "1.0"
+    assert manifest["verbose_diagnostics"] is True
+    assert "kappa_after" in manifest["verbose_tensor_fields"]
+    assert "AssignmentEnergy" in manifest["energy_breakdown_fields"]
+    assert len(manifest["episode_metadata"]) == 24
+    assert all("run_index" in item and "episode" in item for item in manifest["episode_metadata"])
+    assert manifest["solver_trace_event_count"] > 0
+    assert len(manifest["solver_trace_events"]) == manifest["solver_trace_event_count"]
+    assert all("run_index" in item and "episode" in item for item in manifest["solver_trace_events"])
     assert "t+1" in manifest["theta_after"]
     assert "episode t" in manifest["timing"]
     assert len(manifest["records"]) == 8

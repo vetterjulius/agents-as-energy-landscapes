@@ -98,6 +98,7 @@ class EnergyAwareSimulatedAnnealingSolver:
         budgeted_landscape: BudgetedLandscape,
         initial_X: torch.Tensor,
         seed: int,
+        trace: Optional[List[Dict[str, Any]]] = None,
     ) -> SolverResult:
         start_time = time.perf_counter()
         rng = np.random.default_rng(seed)
@@ -124,6 +125,14 @@ class EnergyAwareSimulatedAnnealingSolver:
 
         X_best = X_curr.clone()
         E_best = E_curr
+        if trace is not None:
+            trace.append({
+                "event_type": "initial_evaluation",
+                "X": X_curr.clone(),
+                "energy": float(E_curr),
+                "temperature": float(self.temperature_init),
+                "iteration": 0,
+            })
 
         accepted_moves = 0
         iterations = 0
@@ -154,12 +163,17 @@ class EnergyAwareSimulatedAnnealingSolver:
                 termination_reason = "budget_exhausted"
                 break
 
-            dE = E_cand - E_curr
+            energy_before = E_curr
+            dE = E_cand - energy_before
+            temperature_before = T
             if dE <= 0.0:
+                acceptance_probability = 1.0
+                random_draw = None
                 accept = True
             else:
-                prob = math.exp(-dE / max(T, 1e-8))
-                accept = bool(rng.random() < prob)
+                acceptance_probability = math.exp(-dE / max(T, 1e-8))
+                random_draw = float(rng.random())
+                accept = bool(random_draw < acceptance_probability)
 
             if accept:
                 X_curr = X_cand
@@ -170,6 +184,25 @@ class EnergyAwareSimulatedAnnealingSolver:
                     E_best = E_curr
                     X_best = X_curr.clone()
 
+            if trace is not None:
+                trace.append({
+                    "event_type": "candidate_evaluation",
+                    "X": X_cand.clone(),
+                    "energy": float(E_cand),
+                    "current_energy_before": float(energy_before),
+                    "candidate_energy": float(E_cand),
+                    "delta_energy": float(dE),
+                    "accepted": bool(accept),
+                    "acceptance_probability": float(acceptance_probability),
+                    "random_draw": random_draw,
+                    "temperature": float(temperature_before),
+                    "iteration": iterations,
+                    "task_index": task_idx,
+                    "from_agent": current_agent,
+                    "to_agent": new_agent,
+                    "best_energy_after": float(E_best),
+                })
+
             # Cooling
             T = max(self.min_temperature, T * self.cooling_rate)
 
@@ -177,6 +210,14 @@ class EnergyAwareSimulatedAnnealingSolver:
             termination_reason = "budget_exhausted"
 
         runtime = time.perf_counter() - start_time
+        if trace is not None:
+            trace.append({
+                "event_type": "final_solution",
+                "X": X_best.clone(),
+                "energy": float(E_best),
+                "termination_reason": termination_reason,
+                "iterations": iterations,
+            })
         return SolverResult(
             X=X_best,
             energy=E_best,
@@ -204,6 +245,7 @@ class EnergyAwareGreedySolver:
         self,
         budgeted_landscape: BudgetedLandscape,
         initial_X: torch.Tensor,
+        trace: Optional[List[Dict[str, Any]]] = None,
     ) -> SolverResult:
         start_time = time.perf_counter()
 
@@ -229,6 +271,13 @@ class EnergyAwareGreedySolver:
 
         X_best = X_curr.clone()
         E_best = E_curr
+        if trace is not None:
+            trace.append({
+                "event_type": "initial_evaluation",
+                "X": X_curr.clone(),
+                "energy": float(E_curr),
+                "iteration": 0,
+            })
 
         accepted_moves = 0
         iterations = 0
@@ -241,6 +290,7 @@ class EnergyAwareGreedySolver:
             best_neighbor_E = E_curr
 
             budget_exhausted_during_scan = False
+            iteration_trace: List[Dict[str, Any]] = []
 
             # Scan 1-move neighborhood
             for t in range(M):
@@ -263,6 +313,19 @@ class EnergyAwareGreedySolver:
                         budget_exhausted_during_scan = True
                         break
 
+                    candidate_event = {
+                        "event_type": "candidate_evaluation",
+                        "X": X_prop.clone(),
+                        "energy": float(E_prop),
+                        "current_energy": float(E_curr),
+                        "improves_current": bool(E_prop < E_curr - 1e-6),
+                        "iteration": iterations,
+                        "task_index": t,
+                        "from_agent": curr_agent,
+                        "to_agent": a,
+                        "selected": False,
+                    }
+                    iteration_trace.append(candidate_event)
                     if E_prop < best_neighbor_E - 1e-6:
                         best_neighbor_E = E_prop
                         best_neighbor_X = X_prop
@@ -277,6 +340,13 @@ class EnergyAwareGreedySolver:
                 X_best = X_curr.clone()
                 E_best = E_curr
                 accepted_moves += 1
+                if iteration_trace:
+                    selected_energy = float(best_neighbor_E)
+                    for event in iteration_trace:
+                        event["selected"] = bool(
+                            abs(event["energy"] - selected_energy) < 1e-12
+                            and torch.equal(event["X"], best_neighbor_X)
+                        )
             else:
                 if budget_exhausted_during_scan:
                     termination_reason = "budget_exhausted"
@@ -284,11 +354,22 @@ class EnergyAwareGreedySolver:
                     termination_reason = "converged_local_optimum"
                 break
 
+            if trace is not None:
+                trace.extend(iteration_trace)
+
             if budgeted_landscape.remaining_budget() <= 0:
                 termination_reason = "budget_exhausted"
                 break
 
         runtime = time.perf_counter() - start_time
+        if trace is not None:
+            trace.append({
+                "event_type": "final_solution",
+                "X": X_best.clone(),
+                "energy": float(E_best),
+                "termination_reason": termination_reason,
+                "iterations": iterations,
+            })
         return SolverResult(
             X=X_best,
             energy=E_best,

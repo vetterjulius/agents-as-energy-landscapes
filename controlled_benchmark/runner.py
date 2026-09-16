@@ -181,23 +181,43 @@ class ControlledBenchmarkRunner:
                 solver_landscape, max_evaluations=self.cfg.max_energy_evaluations
             )
             initial_X = self._get_initial_assignment(N, M)
+            solver_trace: Optional[List[Dict[str, Any]]] = [] if self.cfg.verbose_diagnostics else None
 
             if solver_id == "Simulated Annealing":
                 solver_result = self.sa_solver.solve(
-                    budgeted, initial_X, seed=seed * 10000 + episode
+                    budgeted,
+                    initial_X,
+                    seed=seed * 10000 + episode,
+                    trace=solver_trace,
                 )
             elif solver_id == "Energy Greedy":
-                solver_result = self.greedy_solver.solve(budgeted, initial_X)
+                solver_result = self.greedy_solver.solve(
+                    budgeted, initial_X, trace=solver_trace
+                )
             elif solver_id == "Exact ILP":
                 solver_result = self.ilp_solver.solve(solver_landscape)
             else:
                 raise ValueError(f"Unknown solver_id: {solver_id}")
 
             X = solver_result.X.clone()
+            if solver_trace is not None and not solver_trace:
+                solver_trace.append(
+                    {
+                        "event_type": "final_solution",
+                        "X": X.clone(),
+                        "energy": float(solver_result.energy),
+                        "termination_reason": solver_result.termination_reason,
+                        "iterations": int(solver_result.iterations),
+                    }
+                )
             theta_before = current_state.Theta.clone()
+            kappa_before = current_state.kappa.clone()
             C_t = _observed_cooccurrence(X)
             internal_energy = solver_landscape.evaluate(X)
             external_energy = ground_truth.evaluate(X)
+            if self.cfg.verbose_diagnostics:
+                internal_breakdown = solver_landscape.breakdown(X)
+                external_breakdown = ground_truth.breakdown(X)
             kappa_norm = float(current_state.kappa.norm().item())
             theta_norm = float(current_state.Theta.norm().item())
             theta_diff_norm = float(
@@ -244,7 +264,10 @@ class ControlledBenchmarkRunner:
             # theta_before is the state used to solve episode t; theta_after is the state
             # produced by X_t and is the state used to solve episode t+1.
             previous_state = current_state.clone()
-            theta_after = manager.step(current_state, X, context)
+            adaptation_trace: Optional[Dict[str, Any]] = {} if self.cfg.verbose_diagnostics else None
+            theta_after = manager.step(
+                current_state, X, context, diagnostics=adaptation_trace
+            )
             for name, value in (
                 ("assignment_matrix", X),
                 ("cooccurrence_matrix", C_t),
@@ -253,16 +276,65 @@ class ControlledBenchmarkRunner:
                 ("ground_truth_dependency", problem_inst.interaction_graph),
             ):
                 _validate_diagnostic_tensor(name, value)
-            mechanism_diagnostics.append(
-                {
-                    "episode": episode,
-                    "assignment_matrix": X.detach().cpu().numpy().copy(),
-                    "cooccurrence_matrix": C_t.detach().cpu().numpy().copy(),
-                    "theta_before": theta_before.detach().cpu().numpy().copy(),
-                    "theta_after": theta_after.Theta.detach().cpu().numpy().copy(),
-                    "ground_truth_dependency": problem_inst.interaction_graph.detach().cpu().numpy().copy(),
+            diagnostic_item = {
+                "episode": episode,
+                "assignment_matrix": X.detach().cpu().numpy().copy(),
+                "cooccurrence_matrix": C_t.detach().cpu().numpy().copy(),
+                "theta_before": theta_before.detach().cpu().numpy().copy(),
+                "theta_after": theta_after.Theta.detach().cpu().numpy().copy(),
+                "ground_truth_dependency": problem_inst.interaction_graph.detach().cpu().numpy().copy(),
+            }
+            if self.cfg.verbose_diagnostics:
+                verbose_tensors = {
+                    "initial_assignment": initial_X,
+                    "agent_capabilities": context.s,
+                    "task_embeddings": context.c,
+                    "co_assignment_costs": context.C,
+                    "risk_weights": context.W_risk,
+                    "kappa_before": kappa_before,
+                    "kappa_after": theta_after.kappa,
+                    "adaptation_risk_probabilities": adaptation_trace["risk_probabilities"],
+                    "adaptation_kappa_target": adaptation_trace["kappa_target"],
+                    "adaptation_theta_observation": adaptation_trace["theta_observation"],
                 }
-            )
+                for name, value in verbose_tensors.items():
+                    _validate_diagnostic_tensor(name, value)
+                    diagnostic_item[name] = value.detach().cpu().numpy().copy()
+                diagnostic_item["internal_energy_breakdown"] = {
+                    key: float(value) for key, value in internal_breakdown.items()
+                }
+                diagnostic_item["external_energy_breakdown"] = {
+                    key: float(value) for key, value in external_breakdown.items()
+                }
+                diagnostic_item["episode_metadata"] = {
+                    "solver_seed": (seed * 10000 + episode) if solver_id == "Simulated Annealing" else None,
+                    "solver_reported_energy": float(solver_result.energy),
+                    "internal_energy": internal_energy,
+                    "external_energy": external_energy,
+                    "energy_evaluations": int(solver_result.energy_evaluations),
+                    "accepted_moves": int(solver_result.accepted_moves),
+                    "iterations": int(solver_result.iterations),
+                    "runtime_sec": float(solver_result.runtime_sec),
+                    "termination_reason": solver_result.termination_reason,
+                    "solver_status": solver_result.status,
+                    "is_optimal": solver_result.is_optimal,
+                    "mip_gap": solver_result.mip_gap,
+                    "timeout": bool(solver_result.timeout),
+                    "fallback_used": bool(solver_result.fallback_used),
+                    "reconfig_cost": records[-1].reconfig_cost,
+                    "co_assignment_conflicts": records[-1].constraint_violations,
+                    "coordination_score": records[-1].coordination_score,
+                    "load_balance": records[-1].load_balance,
+                    "kappa_norm_before": records[-1].kappa_norm,
+                    "theta_norm_before": records[-1].theta_norm,
+                    "theta_diff_norm_before": records[-1].theta_diff_norm,
+                    "delta_kappa_norm": records[-1].delta_kappa_norm,
+                    "delta_theta_norm": records[-1].delta_theta_norm,
+                    "kappa_update_active": adaptation_trace["kappa_update_active"],
+                    "theta_update_active": adaptation_trace["theta_update_active"],
+                }
+                diagnostic_item["solver_trace"] = solver_trace or []
+            mechanism_diagnostics.append(diagnostic_item)
             current_state = theta_after
             previous_X = X
 
@@ -322,6 +394,7 @@ class ControlledBenchmarkRunner:
         output_dir: str,
         diagnostics: List[Dict[str, Any]],
         run_metadata: List[Dict[str, Any]],
+        verbose: bool = False,
     ) -> None:
         """Write dense per-episode mechanism tensors plus a JSON-readable manifest."""
         if not diagnostics:
@@ -337,16 +410,73 @@ class ControlledBenchmarkRunner:
             values = np.stack([item[name] for item in diagnostics])
             return values.reshape((run_count, episode_count) + values.shape[1:])
 
-        np.savez_compressed(
-            os.path.join(output_dir, "mechanism_diagnostics.npz"),
-            assignment_matrix=_stack("assignment_matrix"),
-            cooccurrence_matrix=_stack("cooccurrence_matrix"),
-            theta_before=_stack("theta_before"),
-            theta_after=_stack("theta_after"),
-            ground_truth_dependency=_stack("ground_truth_dependency"),
-            episode=np.asarray(
+        payload: Dict[str, np.ndarray] = {
+            "assignment_matrix": _stack("assignment_matrix"),
+            "cooccurrence_matrix": _stack("cooccurrence_matrix"),
+            "theta_before": _stack("theta_before"),
+            "theta_after": _stack("theta_after"),
+            "ground_truth_dependency": _stack("ground_truth_dependency"),
+            "episode": np.asarray(
                 [item["episode"] for item in diagnostics], dtype=np.int64
             ).reshape(run_count, episode_count),
+        }
+        verbose_tensor_fields: List[str] = []
+        if verbose:
+            verbose_tensor_fields = [
+                "initial_assignment",
+                "agent_capabilities",
+                "task_embeddings",
+                "co_assignment_costs",
+                "risk_weights",
+                "kappa_before",
+                "kappa_after",
+                "adaptation_risk_probabilities",
+                "adaptation_kappa_target",
+                "adaptation_theta_observation",
+            ]
+            for field_name in verbose_tensor_fields:
+                payload[field_name] = _stack(field_name)
+            breakdown_keys = sorted(diagnostics[0]["internal_energy_breakdown"])
+            for key in breakdown_keys:
+                payload[f"internal_energy_{key}"] = np.asarray(
+                    [item["internal_energy_breakdown"][key] for item in diagnostics],
+                    dtype=np.float64,
+                ).reshape(run_count, episode_count)
+                payload[f"external_energy_{key}"] = np.asarray(
+                    [item["external_energy_breakdown"][key] for item in diagnostics],
+                    dtype=np.float64,
+                ).reshape(run_count, episode_count)
+        trace_events: List[Dict[str, Any]] = []
+        trace_assignments: List[np.ndarray] = []
+        if verbose:
+            for run_index, item in enumerate(diagnostics):
+                for event_index, event in enumerate(item.get("solver_trace", [])):
+                    trace_assignments.append(event["X"].detach().cpu().numpy().copy())
+                    trace_events.append(
+                        {
+                            "run_index": run_index,
+                            "episode": int(item["episode"]),
+                            "event_index": event_index,
+                            **{
+                                key: value
+                                for key, value in event.items()
+                                if key != "X"
+                            },
+                        }
+                    )
+            if trace_assignments:
+                payload["trace_assignment_matrix"] = np.stack(trace_assignments)
+                payload["trace_event_index"] = np.asarray(
+                    [event["event_index"] for event in trace_events], dtype=np.int64
+                )
+                payload["trace_run_index"] = np.asarray(
+                    [event["run_index"] for event in trace_events], dtype=np.int64
+                )
+                payload["trace_episode"] = np.asarray(
+                    [event["episode"] for event in trace_events], dtype=np.int64
+                )
+        np.savez_compressed(
+            os.path.join(output_dir, "mechanism_diagnostics.npz"), **payload
         )
         with open(
             os.path.join(output_dir, "mechanism_diagnostics.json"), "w", encoding="utf-8"
@@ -362,6 +492,27 @@ class ControlledBenchmarkRunner:
                     "theta_after": "Theta_{t+1}, produced from X_t and used to solve episode t+1",
                     "ground_truth_dependency": "Episode-t interaction_graph for structural comparison",
                     "timing": "The update from episode t is applied only after all episode-t metrics and affects episode t+1.",
+                    "verbose_diagnostics": verbose,
+                    "verbose_tensor_fields": verbose_tensor_fields,
+                    "energy_breakdown_fields": (
+                        sorted(diagnostics[0]["internal_energy_breakdown"])
+                        if verbose else []
+                    ),
+                    "solver_trace": "trace_assignment_matrix plus solver_trace_events; one event per evaluated/proposed candidate and final solution",
+                    "solver_trace_tensor_order": ["event", "row", "column"],
+                    "episode_metadata": (
+                        [
+                            {
+                                "run_index": run_index,
+                                "episode": int(item["episode"]),
+                                **item["episode_metadata"],
+                            }
+                            for run_index, item in enumerate(diagnostics)
+                        ]
+                        if verbose else []
+                    ),
+                    "solver_trace_event_count": len(trace_events),
+                    "solver_trace_events": trace_events,
                     "records": run_metadata,
                 },
                 handle,
@@ -554,7 +705,10 @@ class ControlledBenchmarkRunner:
                         )
 
         self._save_mechanism_diagnostics(
-            self.cfg.output_dir, mechanism_diagnostics, mechanism_run_metadata
+            self.cfg.output_dir,
+            mechanism_diagnostics,
+            mechanism_run_metadata,
+            verbose=self.cfg.verbose_diagnostics,
         )
         runs_df = pd.DataFrame(runs)
         episodes_df = pd.DataFrame(episodes)
@@ -765,6 +919,7 @@ class ControlledBenchmarkRunner:
             "no_hidden_change_detection": True,
             "no_warm_start": True,
             "deterministic_initialization": self.cfg.initial_x_mode,
+            "verbose_diagnostics": self.cfg.verbose_diagnostics,
             "total_runtime_sec": runtime,
         }
 

@@ -64,6 +64,11 @@ def parse_args():
         action="store_true",
         help="Skip dynamic ILP runs even in quick mode.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Write comprehensive per-episode mechanism diagnostics without changing benchmark behavior.",
+    )
     return parser.parse_args()
 
 
@@ -81,6 +86,8 @@ def main():
         overrides["perturb_episode"] = args.perturb_episode
     if args.skip_ilp:
         overrides["run_ilp_dynamic"] = False
+    if args.verbose:
+        overrides["verbose_diagnostics"] = True
 
     if args.seeds is not None:
         overrides["seeds"] = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
