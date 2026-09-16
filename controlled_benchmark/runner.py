@@ -77,6 +77,23 @@ def _slug(value: str) -> str:
     return "_".join(value.lower().replace("-", " ").split())
 
 
+def _observed_cooccurrence(X: torch.Tensor, epsilon: float = 1e-8) -> torch.Tensor:
+    """Reproduce the adaptation module's normalized, symmetric off-diagonal C_t."""
+    co = X.T @ X
+    co_sum = co.sum().item()
+    if co_sum < epsilon:
+        return torch.zeros_like(co)
+    co_norm = co / (co_sum + epsilon)
+    result = (co_norm + co_norm.T) / 2.0
+    result.fill_diagonal_(0.0)
+    return result
+
+
+def _validate_diagnostic_tensor(name: str, value: torch.Tensor) -> None:
+    if not torch.isfinite(value).all():
+        raise RuntimeError(f"Mechanism diagnostic {name} contains NaN or Inf values")
+
+
 class ControlledBenchmarkRunner:
     """Runner for the controlled landscape/solver benchmark."""
 
@@ -89,6 +106,8 @@ class ControlledBenchmarkRunner:
         )
         self.greedy_solver = EnergyAwareGreedySolver()
         self.ilp_solver = FixedLandscapeILPSolver(time_limit_sec=config.ilp_time_limit_sec)
+        # Populated by run_trajectory; kept separate from the tabular episode log.
+        self.last_mechanism_diagnostics: List[Dict[str, Any]] = []
 
     def _get_initial_assignment(self, N: int, M: int) -> torch.Tensor:
         X = torch.zeros(N, M, dtype=torch.float32)
@@ -136,6 +155,7 @@ class ControlledBenchmarkRunner:
         )
         current_state = make_initial_landscape_state(trajectory[0])
         records: List[EpisodeRecord] = []
+        mechanism_diagnostics: List[Dict[str, Any]] = []
         previous_X: Optional[torch.Tensor] = None
         previous_state: Optional[LandscapeState] = None
         state_snapshots: Dict[int, LandscapeState] = {}
@@ -174,6 +194,8 @@ class ControlledBenchmarkRunner:
                 raise ValueError(f"Unknown solver_id: {solver_id}")
 
             X = solver_result.X.clone()
+            theta_before = current_state.Theta.clone()
+            C_t = _observed_cooccurrence(X)
             internal_energy = solver_landscape.evaluate(X)
             external_energy = ground_truth.evaluate(X)
             kappa_norm = float(current_state.kappa.norm().item())
@@ -219,8 +241,29 @@ class ControlledBenchmarkRunner:
             )
 
             # The observation from episode t is applied only after all episode-t metrics.
+            # theta_before is the state used to solve episode t; theta_after is the state
+            # produced by X_t and is the state used to solve episode t+1.
             previous_state = current_state.clone()
-            current_state = manager.step(current_state, X, context)
+            theta_after = manager.step(current_state, X, context)
+            for name, value in (
+                ("assignment_matrix", X),
+                ("cooccurrence_matrix", C_t),
+                ("theta_before", theta_before),
+                ("theta_after", theta_after.Theta),
+                ("ground_truth_dependency", problem_inst.interaction_graph),
+            ):
+                _validate_diagnostic_tensor(name, value)
+            mechanism_diagnostics.append(
+                {
+                    "episode": episode,
+                    "assignment_matrix": X.detach().cpu().numpy().copy(),
+                    "cooccurrence_matrix": C_t.detach().cpu().numpy().copy(),
+                    "theta_before": theta_before.detach().cpu().numpy().copy(),
+                    "theta_after": theta_after.Theta.detach().cpu().numpy().copy(),
+                    "ground_truth_dependency": problem_inst.interaction_graph.detach().cpu().numpy().copy(),
+                }
+            )
+            current_state = theta_after
             previous_X = X
 
         if reference_energy is None:
@@ -239,6 +282,7 @@ class ControlledBenchmarkRunner:
             kappa_change = float((end_state.kappa - start_state.kappa).norm().item())
             theta_change = float((end_state.Theta - start_state.Theta).norm().item())
 
+        self.last_mechanism_diagnostics = mechanism_diagnostics
         summary = compute_trajectory_summary(
             records=records,
             scenario_id=scenario_id,
@@ -273,6 +317,57 @@ class ControlledBenchmarkRunner:
             )
         return cells
 
+    @staticmethod
+    def _save_mechanism_diagnostics(
+        output_dir: str,
+        diagnostics: List[Dict[str, Any]],
+        run_metadata: List[Dict[str, Any]],
+    ) -> None:
+        """Write dense per-episode mechanism tensors plus a JSON-readable manifest."""
+        if not diagnostics:
+            return
+        os.makedirs(output_dir, exist_ok=True)
+        run_count = len(run_metadata)
+        episode_counts = [int(item["episode_count"]) for item in run_metadata]
+        if len(set(episode_counts)) != 1 or sum(episode_counts) != len(diagnostics):
+            raise RuntimeError("Mechanism diagnostic runs have inconsistent episode counts")
+        episode_count = episode_counts[0]
+
+        def _stack(name: str) -> np.ndarray:
+            values = np.stack([item[name] for item in diagnostics])
+            return values.reshape((run_count, episode_count) + values.shape[1:])
+
+        np.savez_compressed(
+            os.path.join(output_dir, "mechanism_diagnostics.npz"),
+            assignment_matrix=_stack("assignment_matrix"),
+            cooccurrence_matrix=_stack("cooccurrence_matrix"),
+            theta_before=_stack("theta_before"),
+            theta_after=_stack("theta_after"),
+            ground_truth_dependency=_stack("ground_truth_dependency"),
+            episode=np.asarray(
+                [item["episode"] for item in diagnostics], dtype=np.int64
+            ).reshape(run_count, episode_count),
+        )
+        with open(
+            os.path.join(output_dir, "mechanism_diagnostics.json"), "w", encoding="utf-8"
+        ) as handle:
+            json.dump(
+                {
+                    "format_version": "1.0",
+                    "tensor_file": "mechanism_diagnostics.npz",
+                    "tensor_order": ["run", "episode", "row", "column"],
+                    "assignment_matrix": "X_t, the solver assignment selected during labeled episode t",
+                    "cooccurrence_matrix": "C_t, computed from X_t before the boundary update",
+                    "theta_before": "Theta_t, the state used to solve episode t",
+                    "theta_after": "Theta_{t+1}, produced from X_t and used to solve episode t+1",
+                    "ground_truth_dependency": "Episode-t interaction_graph for structural comparison",
+                    "timing": "The update from episode t is applied only after all episode-t metrics and affects episode t+1.",
+                    "records": run_metadata,
+                },
+                handle,
+                indent=2,
+            )
+
     def run_benchmark(self) -> Dict[str, Any]:
         started = time.time()
         os.makedirs(self.cfg.output_dir, exist_ok=True)
@@ -287,6 +382,8 @@ class ControlledBenchmarkRunner:
         )
         runs: List[Dict[str, Any]] = []
         episodes: List[Dict[str, Any]] = []
+        mechanism_diagnostics: List[Dict[str, Any]] = []
+        mechanism_run_metadata: List[Dict[str, Any]] = []
 
         for scenario_id in self.cfg.scenarios:
             for seed in self.cfg.seeds:
@@ -329,6 +426,21 @@ class ControlledBenchmarkRunner:
                         reference_energy=reference_energy,
                         reference_method=reference_method,
                         reference_valid=reference_valid,
+                    )
+                    run_mechanism_diagnostics = self.last_mechanism_diagnostics
+                    mechanism_run_index = len(mechanism_run_metadata)
+                    mechanism_diagnostics.extend(run_mechanism_diagnostics)
+                    mechanism_run_metadata.append(
+                        {
+                            "run_index": mechanism_run_index,
+                            "run_id": run_id,
+                            "scenario_id": scenario_id,
+                            "seed": seed,
+                            "solver_id": solver_id,
+                            "landscape_id": landscape_id,
+                            "adaptation_mode": adaptation_mode,
+                            "episode_count": len(run_mechanism_diagnostics),
+                        }
                     )
                     run = {
                         "run_id": run_id,
@@ -441,6 +553,9 @@ class ControlledBenchmarkRunner:
                             }
                         )
 
+        self._save_mechanism_diagnostics(
+            self.cfg.output_dir, mechanism_diagnostics, mechanism_run_metadata
+        )
         runs_df = pd.DataFrame(runs)
         episodes_df = pd.DataFrame(episodes)
         runs_df.to_csv(os.path.join(self.cfg.output_dir, "runs.csv"), index=False)
