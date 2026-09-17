@@ -7,6 +7,7 @@ import platform
 import subprocess
 import sys
 import time
+from pathlib import Path
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -94,6 +95,122 @@ def _validate_diagnostic_tensor(name: str, value: torch.Tensor) -> None:
         raise RuntimeError(f"Mechanism diagnostic {name} contains NaN or Inf values")
 
 
+def _json_safe(value: Any) -> Any:
+    """Convert scalar numpy values in trace records to standard JSON values."""
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+class _IncrementalDiagnosticWriter:
+    """Persist mechanism diagnostics in bounded per-run chunks.
+
+    NPZ archives are not appendable.  Each completed run is therefore written to
+    its own compressed chunk immediately; the manifest is updated atomically so
+    an interrupted benchmark still leaves readable completed-run diagnostics.
+    """
+
+    def __init__(self, output_dir: str, verbose: bool, expected_runs: int):
+        self.output_dir = Path(output_dir) / "mechanism_diagnostics"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.verbose = verbose
+        self.expected_runs = expected_runs
+        self.chunks: List[Dict[str, Any]] = []
+        self.manifest_path = self.output_dir.parent / "mechanism_diagnostics.json"
+        self._write_manifest()
+
+    @staticmethod
+    def _stack(diagnostics: List[Dict[str, Any]], name: str) -> np.ndarray:
+        return np.stack([item[name] for item in diagnostics])
+
+    def write_run(self, diagnostics: List[Dict[str, Any]], run_metadata: Dict[str, Any]) -> None:
+        if not diagnostics:
+            return
+        run_index = int(run_metadata["run_index"])
+        payload: Dict[str, np.ndarray] = {
+            name: self._stack(diagnostics, name)
+            for name in (
+                "assignment_matrix", "cooccurrence_matrix", "theta_before",
+                "theta_after", "ground_truth_dependency",
+            )
+        }
+        payload["episode"] = np.asarray([item["episode"] for item in diagnostics], dtype=np.int64)
+        tensor_fields: List[str] = []
+        breakdown_fields: List[str] = []
+        if self.verbose:
+            tensor_fields = [
+                "initial_assignment", "agent_capabilities", "task_embeddings",
+                "co_assignment_costs", "risk_weights", "kappa_before", "kappa_after",
+                "adaptation_risk_probabilities", "adaptation_kappa_target",
+                "adaptation_theta_observation",
+            ]
+            for field in tensor_fields:
+                payload[field] = self._stack(diagnostics, field)
+            breakdown_fields = sorted(diagnostics[0]["internal_energy_breakdown"])
+            for key in breakdown_fields:
+                payload[f"internal_energy_{key}"] = np.asarray(
+                    [item["internal_energy_breakdown"][key] for item in diagnostics], dtype=np.float64
+                )
+                payload[f"external_energy_{key}"] = np.asarray(
+                    [item["external_energy_breakdown"][key] for item in diagnostics], dtype=np.float64
+                )
+
+        trace_events: List[Dict[str, Any]] = []
+        trace_assignments: List[np.ndarray] = []
+        if self.verbose:
+            for item in diagnostics:
+                for event_index, event in enumerate(item.get("solver_trace", [])):
+                    trace_assignments.append(event["X"].detach().cpu().numpy())
+                    trace_events.append({
+                        "run_index": run_index,
+                        "episode": int(item["episode"]),
+                        "event_index": event_index,
+                        **{key: _json_safe(value) for key, value in event.items() if key != "X"},
+                    })
+            if trace_assignments:
+                payload["trace_assignment_matrix"] = np.stack(trace_assignments)
+                payload["trace_event_index"] = np.asarray([e["event_index"] for e in trace_events], dtype=np.int64)
+                payload["trace_run_index"] = np.full(len(trace_events), run_index, dtype=np.int64)
+                payload["trace_episode"] = np.asarray([e["episode"] for e in trace_events], dtype=np.int64)
+
+        filename = f"chunk_{run_index:06d}.npz"
+        np.savez_compressed(self.output_dir / filename, **payload)
+        self.chunks.append({
+            "run_index": run_index,
+            "file": f"mechanism_diagnostics/{filename}",
+            "run_metadata": run_metadata,
+            "episode_metadata": [
+                {"run_index": run_index, "episode": int(item["episode"]), **item["episode_metadata"]}
+                for item in diagnostics
+            ] if self.verbose else [],
+            "solver_trace_events": trace_events,
+            "tensor_fields": list(payload),
+        })
+        self._write_manifest()
+
+    def _write_manifest(self) -> None:
+        manifest = {
+            "format_version": "2.0-chunked",
+            "tensor_order": ["episode", "row", "column"],
+            "verbose_diagnostics": self.verbose,
+            "timing": "X_t and C_t belong to labeled episode t; theta_before is Theta_t; theta_after is Theta_{t+1}. The update from t affects only t+1.",
+            "chunks_directory": "mechanism_diagnostics",
+            "expected_runs": self.expected_runs,
+            "completed_runs": len(self.chunks),
+            "chunks": self.chunks,
+            "assignment_matrix": "X_t, the solver assignment selected during labeled episode t",
+            "cooccurrence_matrix": "C_t, computed from X_t before the boundary update",
+            "theta_before": "Theta_t, the state used to solve episode t",
+            "theta_after": "Theta_{t+1}, produced from X_t and used to solve episode t+1",
+            "ground_truth_dependency": "Episode-t interaction_graph for structural comparison",
+            "solver_trace": "trace_assignment_matrix and solver_trace_events are stored per chunk; event order is local to the episode",
+        }
+        temp = self.manifest_path.with_suffix(".json.tmp")
+        with open(temp, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2)
+        os.replace(temp, self.manifest_path)
+
+
 class ControlledBenchmarkRunner:
     """Runner for the controlled landscape/solver benchmark."""
 
@@ -159,6 +276,12 @@ class ControlledBenchmarkRunner:
         previous_X: Optional[torch.Tensor] = None
         previous_state: Optional[LandscapeState] = None
         state_snapshots: Dict[int, LandscapeState] = {}
+        snapshot_start = self.cfg.perturb_episode
+        snapshot_end = min(
+            self.cfg.perturb_episode + self.cfg.post_ppee_window,
+            len(trajectory) - 1,
+        )
+        snapshot_episodes = {snapshot_start, snapshot_end}
 
         for episode, problem_inst in enumerate(trajectory):
             context = problem_instance_to_problem_context(
@@ -229,7 +352,8 @@ class ControlledBenchmarkRunner:
             else:
                 delta_kappa = float((current_state.kappa - previous_state.kappa).norm().item())
                 delta_theta = float((current_state.Theta - previous_state.Theta).norm().item())
-            state_snapshots[episode] = current_state.clone()
+            if episode in snapshot_episodes:
+                state_snapshots[episode] = current_state.clone()
 
             records.append(
                 EpisodeRecord(
@@ -342,11 +466,6 @@ class ControlledBenchmarkRunner:
             target = trajectory[min(self.cfg.perturb_episode, len(trajectory) - 1)]
             reference_energy, reference_method, reference_valid, _ = self._ground_truth_reference(target)
 
-        snapshot_start = self.cfg.perturb_episode
-        snapshot_end = min(
-            self.cfg.perturb_episode + self.cfg.post_ppee_window,
-            len(trajectory) - 1,
-        )
         kappa_change = theta_change = None
         if snapshot_start < len(trajectory) and snapshot_end >= snapshot_start:
             start_state = state_snapshots[snapshot_start]
@@ -531,10 +650,36 @@ class ControlledBenchmarkRunner:
             f"= {expected_runs} runs",
             flush=True,
         )
-        runs: List[Dict[str, Any]] = []
-        episodes: List[Dict[str, Any]] = []
-        mechanism_diagnostics: List[Dict[str, Any]] = []
+        # Persist tabular rows and mechanism chunks as each run completes.  This
+        # keeps the peak memory bounded by one trajectory/run rather than the
+        # complete verbose benchmark.
+        runs_path = os.path.join(self.cfg.output_dir, "runs.csv")
+        episodes_path = os.path.join(self.cfg.output_dir, "episodes.csv")
+        for path in (runs_path, episodes_path):
+            if os.path.exists(path):
+                os.remove(path)
         mechanism_run_metadata: List[Dict[str, Any]] = []
+        diagnostic_bytes_per_episode = (
+            self.cfg.num_agents * self.cfg.num_tasks * 4
+            + 4 * self.cfg.num_tasks * self.cfg.num_tasks * 4
+        )
+        if self.cfg.verbose_diagnostics:
+            diagnostic_bytes_per_episode *= 4
+            diagnostic_bytes_per_episode += self.cfg.max_energy_evaluations * self.cfg.num_agents * self.cfg.num_tasks * 4
+        estimated_diagnostic_bytes = expected_runs * self.cfg.num_episodes * diagnostic_bytes_per_episode
+        # Keep the legacy consolidated NPZ only for genuinely small test/quick
+        # artifacts.  Larger runs use the chunked writer exclusively.
+        legacy_allowed = (
+            not self.cfg.verbose_diagnostics
+            or expected_runs * self.cfg.num_episodes * self.cfg.max_energy_evaluations <= 10_000
+        )
+        legacy_diagnostics: Optional[List[Dict[str, Any]]] = (
+            [] if legacy_allowed and estimated_diagnostic_bytes <= 16 * 1024 * 1024 else None
+        )
+        diagnostic_writer = _IncrementalDiagnosticWriter(
+            self.cfg.output_dir, self.cfg.verbose_diagnostics, expected_runs
+        )
+        run_rows_written = episode_rows_written = False
 
         for scenario_id in self.cfg.scenarios:
             for seed in self.cfg.seeds:
@@ -580,19 +725,23 @@ class ControlledBenchmarkRunner:
                     )
                     run_mechanism_diagnostics = self.last_mechanism_diagnostics
                     mechanism_run_index = len(mechanism_run_metadata)
-                    mechanism_diagnostics.extend(run_mechanism_diagnostics)
-                    mechanism_run_metadata.append(
-                        {
-                            "run_index": mechanism_run_index,
-                            "run_id": run_id,
-                            "scenario_id": scenario_id,
-                            "seed": seed,
-                            "solver_id": solver_id,
-                            "landscape_id": landscape_id,
-                            "adaptation_mode": adaptation_mode,
-                            "episode_count": len(run_mechanism_diagnostics),
-                        }
-                    )
+                    run_mechanism_metadata = {
+                        "run_index": mechanism_run_index,
+                        "run_id": run_id,
+                        "scenario_id": scenario_id,
+                        "seed": seed,
+                        "solver_id": solver_id,
+                        "landscape_id": landscape_id,
+                        "adaptation_mode": adaptation_mode,
+                        "episode_count": len(run_mechanism_diagnostics),
+                    }
+                    mechanism_run_metadata.append(run_mechanism_metadata)
+                    diagnostic_writer.write_run(run_mechanism_diagnostics, run_mechanism_metadata)
+                    if legacy_diagnostics is not None:
+                        legacy_diagnostics.extend(run_mechanism_diagnostics)
+                    # Release the runner's reference as soon as the completed
+                    # run has been serialized; the next run must not retain it.
+                    self.last_mechanism_diagnostics = []
                     run = {
                         "run_id": run_id,
                         "experiment_id": self.cfg.experiment_id,
@@ -647,8 +796,11 @@ class ControlledBenchmarkRunner:
                         "git_commit": self.cfg.git_commit,
                         "benchmark_version": self.cfg.benchmark_version,
                     }
-                    runs.append(run)
-                    completed_runs = len(runs)
+                    pd.DataFrame([run]).to_csv(
+                        runs_path, mode="a", header=not run_rows_written, index=False
+                    )
+                    run_rows_written = True
+                    completed_runs = mechanism_run_index + 1
                     print(
                         f"[benchmark] [{completed_runs}/{expected_runs}] "
                         f"scenario={scenario_id} seed={seed} solver={solver_id} "
@@ -656,8 +808,9 @@ class ControlledBenchmarkRunner:
                         f"elapsed={time.time() - started:.1f}s",
                         flush=True,
                     )
+                    episode_rows = []
                     for record in episode_records:
-                        episodes.append(
+                        episode_rows.append(
                             {
                                 "run_id": run_id,
                                 "experiment_id": self.cfg.experiment_id,
@@ -703,17 +856,23 @@ class ControlledBenchmarkRunner:
                                 "git_commit": self.cfg.git_commit,
                             }
                         )
+                    if episode_rows:
+                        pd.DataFrame(episode_rows).to_csv(
+                            episodes_path, mode="a", header=not episode_rows_written, index=False
+                        )
+                        episode_rows_written = True
 
-        self._save_mechanism_diagnostics(
-            self.cfg.output_dir,
-            mechanism_diagnostics,
-            mechanism_run_metadata,
-            verbose=self.cfg.verbose_diagnostics,
-        )
-        runs_df = pd.DataFrame(runs)
-        episodes_df = pd.DataFrame(episodes)
-        runs_df.to_csv(os.path.join(self.cfg.output_dir, "runs.csv"), index=False)
-        episodes_df.to_csv(os.path.join(self.cfg.output_dir, "episodes.csv"), index=False)
+        # Small artifacts retain the historical single-NPZ compatibility format;
+        # large artifacts remain chunked and never need a full in-memory stack.
+        if legacy_diagnostics is not None:
+            self._save_mechanism_diagnostics(
+                self.cfg.output_dir,
+                legacy_diagnostics,
+                mechanism_run_metadata,
+                verbose=self.cfg.verbose_diagnostics,
+            )
+        runs_df = pd.read_csv(runs_path)
+        episodes_df = pd.read_csv(episodes_path)
 
         summary_metrics = [
             "ppee_10",

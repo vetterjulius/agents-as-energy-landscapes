@@ -134,6 +134,27 @@ def test_verbose_trace_does_not_change_solver_results():
     assert len(verbose.last_mechanism_diagnostics[0]["solver_trace"]) > 0
 
 
+def test_large_verbose_artifact_uses_incremental_chunks(tmp_path):
+    cfg = BenchmarkConfig.quick_mode(
+        seeds=[42], scenarios=["Stationary"], num_episodes=1, perturb_episode=0,
+        num_agents=1, num_tasks=6, max_energy_evaluations=100000,
+        output_dir=str(tmp_path), verbose_diagnostics=True,
+    )
+    result = ControlledBenchmarkRunner(cfg).run_benchmark()
+
+    chunk_dir = tmp_path / "mechanism_diagnostics"
+    manifest = json.loads((tmp_path / "mechanism_diagnostics.json").read_text(encoding="utf-8"))
+    assert result["integrity"]["all_checks_pass"] is True
+    assert manifest["format_version"] == "2.0-chunked"
+    assert manifest["completed_runs"] == 8
+    assert len(list(chunk_dir.glob("chunk_*.npz"))) == 8
+    assert not (tmp_path / "mechanism_diagnostics.npz").exists()
+    with np.load(chunk_dir / "chunk_000000.npz") as artifact:
+        assert artifact["assignment_matrix"].shape == (1, 1, 6)
+        assert artifact["cooccurrence_matrix"].shape == (1, 6, 6)
+        assert np.isfinite(artifact["assignment_matrix"]).all()
+
+
 def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_path):
     cfg = BenchmarkConfig.quick_mode(
         seeds=[42], scenarios=["Dependency Change"], num_episodes=3,
