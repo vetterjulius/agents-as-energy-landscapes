@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Dict
 import numpy as np
 import torch
 from scipy.optimize import Bounds, LinearConstraint, milp
