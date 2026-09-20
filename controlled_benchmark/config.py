@@ -58,15 +58,25 @@ class BenchmarkConfig:
             "Dependency Change",
         ]
     )
+    conditions: List[str] = field(
+        default_factory=lambda: [
+            "conventional_greedy",
+            "static_energy_greedy",
+            "static_energy_sa",
+            "adaptive_energy_greedy",
+            "adaptive_energy_sa",
+        ]
+    )
     solvers: List[str] = field(
-        default_factory=lambda: ["Simulated Annealing", "Energy Greedy"]
+        default_factory=lambda: ["Conventional Greedy", "Simulated Annealing", "Energy Greedy"]
     )
     landscapes: List[str] = field(
-        default_factory=lambda: ["Static", "Adaptive Full"]
+        default_factory=lambda: ["Conventional", "Static", "Adaptive Full"]
     )
     ablations: List[str] = field(
         default_factory=lambda: ["Static", "kappa-only", "theta-only", "Full"]
     )
+
 
     # Initial Assignment Policy (Fairness: identical starting point for all solvers)
     initial_x_mode: str = "deterministic_round_robin"

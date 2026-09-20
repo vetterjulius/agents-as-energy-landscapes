@@ -591,3 +591,99 @@ class FixedLandscapeILPSolver:
                 fallback_used=True,
                 time_limit_sec=self.time_limit_sec,
             )
+
+
+class ConventionalGreedySolver:
+    """
+    Conventional Myopic Greedy Solver (B0 Baseline).
+
+    Goal:
+    Myopic capability-cost allocation without interaction modeling.
+
+    Scoring logic:
+    For each agent a in [0, N-1] and task i in [0, M-1]:
+        U_conv(a, i) = U_cap(a, i) + U_risk(a, i) + U_taskcost(a, i)
+
+    where:
+        U_cap(a, i) = ||s_a - c_i||^2 - lambda_align * (s_a . c_i)
+        U_risk(a, i) = - risk_weight * ln( p_{a, i} + 1e-8 )
+            with p_{a, i} = sigmoid( [s_a, c_i, 0_d] . W_risk / sqrt(d) )
+        U_taskcost(a, i) = 0.0 (no direct individual agent-task cost beyond capability and risk)
+
+    Decision rule:
+        For each task i, select agent a* = argmin_a U_conv(a, i).
+        Set X[a*, i] = 1.0, and 0.0 for all other agents.
+
+    Scientific boundaries & fairness constraints:
+    - B0 does NOT use kappa (memory adaptation state)
+    - B0 does NOT use Theta (learned interaction state)
+    - B0 does NOT use G_gt (ground-truth dependency graph)
+    - B0 does NOT use C (task-task co-assignment cost matrix)
+    - B0 does NOT use PPEE, CEE, reference ILP, or future/past episode information
+    - B0 does NOT call BudgetedLandscape.evaluate(X) or use landscape energy evaluation as hidden objective function
+    - B0 is a single-pass, deterministic, non-iterative allocation solver (energy_evaluations = 0)
+    """
+
+    def solve(
+        self,
+        problem_or_landscape: Any,
+        initial_X: Optional[torch.Tensor] = None,
+        trace: Optional[List[Dict[str, Any]]] = None,
+    ) -> SolverResult:
+        start_time = time.perf_counter()
+
+        if hasattr(problem_or_landscape, "problem"):
+            problem = problem_or_landscape.problem
+        else:
+            problem = problem_or_landscape
+
+        N = problem.N
+        M = problem.M
+        d = problem.d
+
+        # 1. Capability distance & alignment score U_cap
+        dist = torch.cdist(problem.s, problem.c) ** 2
+        align_sc = problem.s @ problem.c.T
+        U_cap = dist - problem.lambda_align * align_sc
+
+        # 2. Risk score U_risk with zero kappa (no memory adaptation state)
+        s_exp = problem.s.unsqueeze(1).expand(-1, M, -1)
+        c_exp = problem.c.unsqueeze(0).expand(N, -1, -1)
+        k_exp = torch.zeros(N, M, d, dtype=problem.s.dtype, device=problem.s.device)
+        x_feat = torch.cat([s_exp, c_exp, k_exp], dim=-1)
+
+        logits = torch.matmul(x_feat, problem.W_risk).squeeze(-1) / math.sqrt(max(d, 1))
+        risk_p = torch.sigmoid(logits)
+        U_risk = -problem.risk_weight * torch.log(risk_p + 1e-8)
+
+        # Total local score per (agent, task) pair
+        U_conv = U_cap + U_risk
+
+        # Deterministic single-pass task assignment
+        X = torch.zeros(N, M, dtype=torch.float32, device=problem.s.device)
+        for t in range(M):
+            best_agent = int(torch.argmin(U_conv[:, t]).item())
+            X[best_agent, t] = 1.0
+
+        runtime = time.perf_counter() - start_time
+
+        if trace is not None:
+            trace.append({
+                "event_type": "final_solution",
+                "X": X.clone(),
+                "energy": 0.0,
+                "termination_reason": "conventional_greedy_complete",
+                "iterations": M,
+            })
+
+        return SolverResult(
+            X=X,
+            energy=0.0,
+            energy_evaluations=0,
+            accepted_moves=0,
+            iterations=M,
+            runtime_sec=runtime,
+            termination_reason="conventional_greedy_complete",
+            status="completed",
+        )
+

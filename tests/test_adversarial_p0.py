@@ -472,8 +472,7 @@ class TestPairedStatisticalGrouping:
         results = runner.run_benchmark()
         stats_df = results["stats_df"]
         families = set(stats_df["hypothesis_family"].unique())
-        expected = {"Family 1: PRIMARY", "Family 2: SECONDARY",
-                    "Family 3: ABLATION", "Family 4: SOLVER INTERACTION"}
+        expected = {"Family 1: FORMULATION", "Family 2: ADAPTATION", "Family 3: SOLVER"}
         missing = expected - families
         assert not missing, f"P1 FAIL: Missing hypothesis families: {missing}"
 

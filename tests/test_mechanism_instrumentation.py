@@ -146,8 +146,8 @@ def test_large_verbose_artifact_uses_incremental_chunks(tmp_path):
     manifest = json.loads((tmp_path / "mechanism_diagnostics.json").read_text(encoding="utf-8"))
     assert result["integrity"]["all_checks_pass"] is True
     assert manifest["format_version"] == "2.0-chunked"
-    assert manifest["completed_runs"] == 8
-    assert len(list(chunk_dir.glob("chunk_*.npz"))) == 8
+    assert manifest["completed_runs"] == 5
+    assert len(list(chunk_dir.glob("chunk_*.npz"))) == 5
     assert not (tmp_path / "mechanism_diagnostics.npz").exists()
     with np.load(chunk_dir / "chunk_000000.npz") as artifact:
         assert artifact["assignment_matrix"].shape == (1, 1, 6)
@@ -169,27 +169,27 @@ def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_
     assert manifest_path.exists()
 
     with np.load(tensor_path) as artifact:
-        assert artifact["assignment_matrix"].shape == (8, 3, 3, 6)
-        assert artifact["cooccurrence_matrix"].shape == (8, 3, 6, 6)
-        assert artifact["theta_before"].shape == (8, 3, 6, 6)
-        assert artifact["theta_after"].shape == (8, 3, 6, 6)
-        assert artifact["ground_truth_dependency"].shape == (8, 3, 6, 6)
-        assert artifact["initial_assignment"].shape == (8, 3, 3, 6)
-        assert artifact["agent_capabilities"].shape == (8, 3, 3, 4)
-        assert artifact["task_embeddings"].shape == (8, 3, 6, 4)
-        assert artifact["co_assignment_costs"].shape == (8, 3, 6, 6)
-        assert artifact["risk_weights"].shape == (8, 3, 12, 1)
-        assert artifact["kappa_before"].shape == (8, 3, 3, 4)
-        assert artifact["kappa_after"].shape == (8, 3, 3, 4)
-        assert artifact["adaptation_risk_probabilities"].shape == (8, 3, 3, 6)
-        assert artifact["adaptation_kappa_target"].shape == (8, 3, 3, 4)
-        assert artifact["adaptation_theta_observation"].shape == (8, 3, 6, 6)
+        assert artifact["assignment_matrix"].shape == (5, 3, 3, 6)
+        assert artifact["cooccurrence_matrix"].shape == (5, 3, 6, 6)
+        assert artifact["theta_before"].shape == (5, 3, 6, 6)
+        assert artifact["theta_after"].shape == (5, 3, 6, 6)
+        assert artifact["ground_truth_dependency"].shape == (5, 3, 6, 6)
+        assert artifact["initial_assignment"].shape == (5, 3, 3, 6)
+        assert artifact["agent_capabilities"].shape == (5, 3, 3, 4)
+        assert artifact["task_embeddings"].shape == (5, 3, 6, 4)
+        assert artifact["co_assignment_costs"].shape == (5, 3, 6, 6)
+        assert artifact["risk_weights"].shape == (5, 3, 12, 1)
+        assert artifact["kappa_before"].shape == (5, 3, 3, 4)
+        assert artifact["kappa_after"].shape == (5, 3, 3, 4)
+        assert artifact["adaptation_risk_probabilities"].shape == (5, 3, 3, 6)
+        assert artifact["adaptation_kappa_target"].shape == (5, 3, 3, 4)
+        assert artifact["adaptation_theta_observation"].shape == (5, 3, 6, 6)
         assert "trace_assignment_matrix" in artifact.files
         assert artifact["trace_assignment_matrix"].shape[1:] == (3, 6)
         assert artifact["trace_assignment_matrix"].shape[0] > 0
         assert "internal_energy_AssignmentEnergy" in artifact.files
         assert "external_energy_RiskEnergy" in artifact.files
-        assert np.array_equal(artifact["episode"], np.tile(np.arange(3), (8, 1)))
+        assert np.array_equal(artifact["episode"], np.tile(np.arange(3), (5, 1)))
         for name in artifact.files:
             assert np.isfinite(artifact[name]).all()
 
@@ -198,12 +198,12 @@ def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_
     assert manifest["verbose_diagnostics"] is True
     assert "kappa_after" in manifest["verbose_tensor_fields"]
     assert "AssignmentEnergy" in manifest["energy_breakdown_fields"]
-    assert len(manifest["episode_metadata"]) == 24
+    assert len(manifest["episode_metadata"]) == 15
     assert all("run_index" in item and "episode" in item for item in manifest["episode_metadata"])
     assert manifest["solver_trace_event_count"] > 0
     assert len(manifest["solver_trace_events"]) == manifest["solver_trace_event_count"]
     assert all("run_index" in item and "episode" in item for item in manifest["solver_trace_events"])
     assert "t+1" in manifest["theta_after"]
     assert "episode t" in manifest["timing"]
-    assert len(manifest["records"]) == 8
+    assert len(manifest["records"]) == 5
     assert result["integrity"]["all_checks_pass"] is True

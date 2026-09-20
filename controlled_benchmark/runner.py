@@ -33,6 +33,7 @@ from controlled_benchmark.scenarios import (
 )
 from controlled_benchmark.solvers import (
     BudgetedLandscape,
+    ConventionalGreedySolver,
     EnergyAwareGreedySolver,
     EnergyAwareSimulatedAnnealingSolver,
     FixedLandscapeILPSolver,
@@ -222,6 +223,7 @@ class ControlledBenchmarkRunner:
             cooling_rate=config.sa_cooling_rate,
         )
         self.greedy_solver = EnergyAwareGreedySolver()
+        self.conventional_greedy_solver = ConventionalGreedySolver()
         self.ilp_solver = FixedLandscapeILPSolver(time_limit_sec=config.ilp_time_limit_sec)
         # Populated by run_trajectory; kept separate from the tabular episode log.
         self.last_mechanism_diagnostics: List[Dict[str, Any]] = []
@@ -306,7 +308,11 @@ class ControlledBenchmarkRunner:
             initial_X = self._get_initial_assignment(N, M)
             solver_trace: Optional[List[Dict[str, Any]]] = [] if self.cfg.verbose_diagnostics else None
 
-            if solver_id == "Simulated Annealing":
+            if solver_id in ("Conventional Greedy", "conventional_greedy"):
+                solver_result = self.conventional_greedy_solver.solve(
+                    context, trace=solver_trace
+                )
+            elif solver_id == "Simulated Annealing":
                 solver_result = self.sa_solver.solve(
                     budgeted,
                     initial_X,
@@ -341,17 +347,24 @@ class ControlledBenchmarkRunner:
             if self.cfg.verbose_diagnostics:
                 internal_breakdown = solver_landscape.breakdown(X)
                 external_breakdown = ground_truth.breakdown(X)
-            kappa_norm = float(current_state.kappa.norm().item())
-            theta_norm = float(current_state.Theta.norm().item())
-            theta_diff_norm = float(
-                (current_state.Theta - problem_inst.interaction_graph).norm().item()
-            )
-            if previous_state is None:
-                delta_kappa = 0.0
-                delta_theta = 0.0
+            if solver_id in ("Conventional Greedy", "conventional_greedy"):
+                kappa_norm = float("nan")
+                theta_norm = float("nan")
+                theta_diff_norm = float("nan")
+                delta_kappa = float("nan")
+                delta_theta = float("nan")
             else:
-                delta_kappa = float((current_state.kappa - previous_state.kappa).norm().item())
-                delta_theta = float((current_state.Theta - previous_state.Theta).norm().item())
+                kappa_norm = float(current_state.kappa.norm().item())
+                theta_norm = float(current_state.Theta.norm().item())
+                theta_diff_norm = float(
+                    (current_state.Theta - problem_inst.interaction_graph).norm().item()
+                )
+                if previous_state is None:
+                    delta_kappa = 0.0
+                    delta_theta = 0.0
+                else:
+                    delta_kappa = float((current_state.kappa - previous_state.kappa).norm().item())
+                    delta_theta = float((current_state.Theta - previous_state.Theta).norm().item())
             if episode in snapshot_episodes:
                 state_snapshots[episode] = current_state.clone()
 
@@ -389,9 +402,20 @@ class ControlledBenchmarkRunner:
             # produced by X_t and is the state used to solve episode t+1.
             previous_state = current_state.clone()
             adaptation_trace: Optional[Dict[str, Any]] = {} if self.cfg.verbose_diagnostics else None
-            theta_after = manager.step(
-                current_state, X, context, diagnostics=adaptation_trace
-            )
+            if solver_id in ("Conventional Greedy", "conventional_greedy"):
+                theta_after = current_state.clone()
+                if adaptation_trace is not None:
+                    adaptation_trace.update({
+                        "kappa_update_active": False,
+                        "theta_update_active": False,
+                        "risk_probabilities": torch.zeros(N, M),
+                        "kappa_target": torch.zeros(N, d),
+                        "theta_observation": torch.zeros(M, M),
+                    })
+            else:
+                theta_after = manager.step(
+                    current_state, X, context, diagnostics=adaptation_trace
+                )
             for name, value in (
                 ("assignment_matrix", X),
                 ("cooccurrence_matrix", C_t),
@@ -467,7 +491,10 @@ class ControlledBenchmarkRunner:
             reference_energy, reference_method, reference_valid, _ = self._ground_truth_reference(target)
 
         kappa_change = theta_change = None
-        if snapshot_start < len(trajectory) and snapshot_end >= snapshot_start:
+        if solver_id in ("Conventional Greedy", "conventional_greedy"):
+            kappa_change = float("nan")
+            theta_change = float("nan")
+        elif snapshot_start < len(trajectory) and snapshot_end >= snapshot_start:
             start_state = state_snapshots[snapshot_start]
             end_state = state_snapshots[snapshot_end]
             kappa_change = float((end_state.kappa - start_state.kappa).norm().item())
@@ -488,22 +515,19 @@ class ControlledBenchmarkRunner:
         )
         return summary, records
 
-    def _cells(self) -> List[Tuple[str, str, str]]:
+    def _cells(self) -> List[Tuple[str, str, str, str]]:
         cells = [
-            ("Simulated Annealing", "Static", "static"),
-            ("Simulated Annealing", "Kappa-only", "kappa-only"),
-            ("Simulated Annealing", "Theta-only", "theta-only"),
-            ("Simulated Annealing", "Full", "full"),
-            ("Energy Greedy", "Static", "static"),
-            ("Energy Greedy", "Kappa-only", "kappa-only"),
-            ("Energy Greedy", "Theta-only", "theta-only"),
-            ("Energy Greedy", "Full", "full"),
+            ("conventional_greedy", "Conventional Greedy", "Conventional", "static"),
+            ("static_energy_greedy", "Energy Greedy", "Static", "static"),
+            ("static_energy_sa", "Simulated Annealing", "Static", "static"),
+            ("adaptive_energy_greedy", "Energy Greedy", "Adaptive Full", "full"),
+            ("adaptive_energy_sa", "Simulated Annealing", "Adaptive Full", "full"),
         ]
         if self.cfg.run_ilp_dynamic:
             cells.extend(
                 [
-                    ("Exact ILP", "Static", "static"),
-                    ("Exact ILP", "Full", "full"),
+                    ("exact_ilp_static", "Exact ILP", "Static", "static"),
+                    ("exact_ilp_full", "Exact ILP", "Full", "full"),
                 ]
             )
         return cells
@@ -708,9 +732,9 @@ class ControlledBenchmarkRunner:
                     flush=True,
                 )
 
-                for solver_id, landscape_id, adaptation_mode in cells:
-                    run_id = "run_{}_{}_{}_{}_{}".format(
-                        _slug(scenario_id), seed, _slug(solver_id), _slug(adaptation_mode), self.cfg.experiment_id
+                for condition_id, solver_id, landscape_id, adaptation_mode in cells:
+                    run_id = "run_{}_{}_{}_{}".format(
+                        _slug(scenario_id), seed, _slug(condition_id), self.cfg.experiment_id
                     )
                     summary, episode_records = self.run_trajectory(
                         scenario_id=scenario_id,
@@ -728,6 +752,7 @@ class ControlledBenchmarkRunner:
                     run_mechanism_metadata = {
                         "run_index": mechanism_run_index,
                         "run_id": run_id,
+                        "condition_id": condition_id,
                         "scenario_id": scenario_id,
                         "seed": seed,
                         "solver_id": solver_id,
@@ -744,6 +769,7 @@ class ControlledBenchmarkRunner:
                     self.last_mechanism_diagnostics = []
                     run = {
                         "run_id": run_id,
+                        "condition_id": condition_id,
                         "experiment_id": self.cfg.experiment_id,
                         "problem_id": f"{scenario_id}_N{self.cfg.num_agents}_M{self.cfg.num_tasks}_seed{seed}",
                         "trajectory_id": trajectory_id,
@@ -813,6 +839,7 @@ class ControlledBenchmarkRunner:
                         episode_rows.append(
                             {
                                 "run_id": run_id,
+                                "condition_id": condition_id,
                                 "experiment_id": self.cfg.experiment_id,
                                 "problem_id": run["problem_id"],
                                 "trajectory_id": trajectory_id,
@@ -922,10 +949,10 @@ class ControlledBenchmarkRunner:
         }
 
     def _integrity_report(
-        self, runs_df: pd.DataFrame, episodes_df: pd.DataFrame, cells: List[Tuple[str, str, str]]
+        self, runs_df: pd.DataFrame, episodes_df: pd.DataFrame, cells: List[Tuple[str, str, str, str]]
     ) -> Dict[str, Any]:
         expected_runs = len(self.cfg.seeds) * len(self.cfg.scenarios) * len(cells)
-        run_key = ["seed", "scenario_id", "solver_id", "adaptation_mode"]
+        run_key = ["seed", "scenario_id", "condition_id"] if "condition_id" in runs_df.columns else ["seed", "scenario_id", "solver_id", "adaptation_mode"]
         duplicates = int(runs_df.duplicated(run_key).sum()) if len(runs_df) else 0
         episode_counts = episodes_df.groupby("run_id")["episode"].nunique() if len(episodes_df) else pd.Series(dtype=int)
         expected_episode_set = set(range(self.cfg.num_episodes))
@@ -974,73 +1001,63 @@ class ControlledBenchmarkRunner:
 
     def _compute_paired_statistics(self, runs_df: pd.DataFrame) -> List[Dict[str, Any]]:
         families: Dict[str, List[Dict[str, Any]]] = {
-            "primary": [], "secondary": [], "ablation": [], "interaction": []
+            "formulation": [],
+            "adaptation": [],
+            "solver": [],
         }
         pair_keys = ["problem_id", "scenario_id", "seed"]
+
         for scenario in self.cfg.scenarios:
             scoped = runs_df[runs_df.scenario_id == scenario]
-            for solver in ["Simulated Annealing", "Energy Greedy"]:
-                full = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == "full")]
-                static = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == "static")]
-                merged = pd.merge(full, static, on=pair_keys, suffixes=("_full", "_static"))
-                if len(merged):
-                    result = analyze_paired_comparison(
-                        merged.ppee_10_full.tolist(), merged.ppee_10_static.tolist(),
-                        "ppee_10", f"{solver}: Full - Static"
-                    )
-                    row = asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 1: PRIMARY"}
-                    families["primary"].append(row)
-                    for metric in ["cumulative_excess_energy", "performance_drop", "recovery_time"]:
-                        result = analyze_paired_comparison(
-                            merged[f"{metric}_full"].tolist(), merged[f"{metric}_static"].tolist(),
-                            metric, f"{solver}: Full - Static"
-                        )
-                        families["secondary"].append(
-                            asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 2: SECONDARY"}
-                        )
-                for mode in ["kappa-only", "theta-only"]:
-                    ablation = scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == mode)]
-                    merged = pd.merge(ablation, static, on=pair_keys, suffixes=("_abl", "_static"))
-                    if len(merged):
-                        for metric in ["ppee_10", "cumulative_excess_energy"]:
-                            result = analyze_paired_comparison(
-                                merged[f"{metric}_abl"].tolist(), merged[f"{metric}_static"].tolist(),
-                                metric, f"{solver}: {mode} - Static"
-                            )
-                            families["ablation"].append(
-                                asdict(result) | {"scenario_id": scenario, "solver_id": solver, "hypothesis_family": "Family 3: ABLATION"}
-                            )
 
-            sa_full = scoped[(scoped.solver_id == "Simulated Annealing") & (scoped.adaptation_mode == "full")]
-            sa_static = scoped[(scoped.solver_id == "Simulated Annealing") & (scoped.adaptation_mode == "static")]
-            gr_full = scoped[(scoped.solver_id == "Energy Greedy") & (scoped.adaptation_mode == "full")]
-            gr_static = scoped[(scoped.solver_id == "Energy Greedy") & (scoped.adaptation_mode == "static")]
-            sa = pd.merge(sa_full, sa_static, on=pair_keys, suffixes=("_full", "_static"))
-            gr = pd.merge(gr_full, gr_static, on=pair_keys, suffixes=("_full", "_static"))
-            both = pd.merge(sa, gr, on=pair_keys, suffixes=("_sa", "_greedy"))
-            if len(both):
-                for metric in ["ppee_10", "cumulative_excess_energy"]:
-                    result = analyze_solver_interaction(
-                        both[f"{metric}_full_sa"].tolist(), both[f"{metric}_static_sa"].tolist(),
-                        both[f"{metric}_full_greedy"].tolist(), both[f"{metric}_static_greedy"].tolist(), metric
+            def get_cond(cond_id: str, solver: str, mode: str):
+                if "condition_id" in scoped.columns:
+                    match = scoped[scoped.condition_id == cond_id]
+                    if len(match) > 0:
+                        return match
+                return scoped[(scoped.solver_id == solver) & (scoped.adaptation_mode == mode)]
+
+            b0 = get_cond("conventional_greedy", "Conventional Greedy", "static")
+            b1 = get_cond("static_energy_greedy", "Energy Greedy", "static")
+            b2 = get_cond("static_energy_sa", "Simulated Annealing", "static")
+            b3 = get_cond("adaptive_energy_greedy", "Energy Greedy", "full")
+            b4 = get_cond("adaptive_energy_sa", "Simulated Annealing", "full")
+
+            # 1. Formulation comparisons (B0 vs B1, B0 vs B2)
+            for target_df, label in [(b1, "B0 vs B1 (ConvGreedy vs StaticGreedy)"), (b2, "B0 vs B2 (ConvGreedy vs StaticSA)")]:
+                merged = pd.merge(b0, target_df, on=pair_keys, suffixes=("_b0", "_target"))
+                if len(merged):
+                    res = analyze_paired_comparison(
+                        merged.ppee_10_b0.tolist(), merged.ppee_10_target.tolist(),
+                        "ppee_10", label
                     )
-                    families["interaction"].append({
-                        "metric": metric,
-                        "comparison": "Solver interaction (SA vs Greedy)",
-                        "scenario_id": scenario,
-                        "solver_id": "Interaction",
-                        "hypothesis_family": "Family 4: SOLVER INTERACTION",
-                        "n_pairs": result.n_pairs,
-                        "mean_adaptive": result.mean_sa_diff,
-                        "mean_static": result.mean_greedy_diff,
-                        "mean_difference": result.mean_interaction,
-                        "median_difference": result.median_interaction,
-                        "ci_95_lower": result.ci_95_lower,
-                        "ci_95_upper": result.ci_95_upper,
-                        "permutation_p_val": result.permutation_p_val,
-                        "wilcoxon_p_val": 1.0,
-                        "cohens_d": result.cohens_d,
-                    })
+                    families["formulation"].append(
+                        asdict(res) | {"scenario_id": scenario, "solver_id": "Formulation", "hypothesis_family": "Family 1: FORMULATION"}
+                    )
+
+            # 2. Adaptation comparisons (B1 vs B3, B2 vs B4)
+            for static_df, adapt_df, label in [(b1, b3, "B1 vs B3 (Greedy Static vs Adaptive)"), (b2, b4, "B2 vs B4 (SA Static vs Adaptive)")]:
+                merged = pd.merge(adapt_df, static_df, on=pair_keys, suffixes=("_adapt", "_static"))
+                if len(merged):
+                    res = analyze_paired_comparison(
+                        merged.ppee_10_adapt.tolist(), merged.ppee_10_static.tolist(),
+                        "ppee_10", label
+                    )
+                    families["adaptation"].append(
+                        asdict(res) | {"scenario_id": scenario, "solver_id": "Adaptation", "hypothesis_family": "Family 2: ADAPTATION"}
+                    )
+
+            # 3. Solver comparisons (B1 vs B2, B3 vs B4)
+            for greedy_df, sa_df, label in [(b1, b2, "B1 vs B2 (Static Greedy vs SA)"), (b3, b4, "B3 vs B4 (Adaptive Greedy vs SA)")]:
+                merged = pd.merge(greedy_df, sa_df, on=pair_keys, suffixes=("_greedy", "_sa"))
+                if len(merged):
+                    res = analyze_paired_comparison(
+                        merged.ppee_10_greedy.tolist(), merged.ppee_10_sa.tolist(),
+                        "ppee_10", label
+                    )
+                    families["solver"].append(
+                        asdict(res) | {"scenario_id": scenario, "solver_id": "Solver", "hypothesis_family": "Family 3: SOLVER"}
+                    )
 
         output: List[Dict[str, Any]] = []
         for name, rows in families.items():

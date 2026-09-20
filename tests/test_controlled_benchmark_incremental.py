@@ -83,7 +83,7 @@ def test_pilot_integrity_and_metadata(tmp_path):
         output_dir=str(tmp_path),
     )
     result = ControlledBenchmarkRunner(cfg).run_benchmark()
-    assert len(result["runs_df"]) == 8
+    assert len(result["runs_df"]) == 5
     assert result["integrity"]["all_checks_pass"] is True
     assert result["integrity"]["duplicate_run_keys"] == 0
     assert result["integrity"]["runs_with_missing_or_duplicate_episodes"] == []
