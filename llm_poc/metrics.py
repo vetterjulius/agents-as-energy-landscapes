@@ -82,7 +82,8 @@ def write_report(summary: dict, out_dir: str) -> Path:
         "# LLM PoC Results",
         "",
         f"- worker mode: `{summary['worker_mode']}` · scorer: `{summary['scorer']}` · "
-        f"model: `{summary['model']}`",
+        f"model requested: `{summary['model']}` · resolved: "
+        f"`{', '.join(summary.get('resolved_models', [])) or 'not returned'}`",
         f"- scale: {summary['n_conditions']} conditions × {summary['n_blocks']} blocks × "
         f"{summary['n_episodes_per_block']} episodes × {summary['n_tasks']} tasks × "
         f"{summary['n_repetitions']} repetitions",
@@ -93,6 +94,9 @@ def write_report(summary: dict, out_dir: str) -> Path:
         "",
         "> Status: hypothesis-generating external validation. Not a confirmatory benchmark;",
         "> no multiplicity-corrected claims are drawn from this experiment.",
+        "> The rubric_proxy is a deterministic exact/substring proxy, not an independent",
+        "> quality judge; do not interpret its scores as model-quality measurements.",
+        "> Live outputs may vary even with a fixed seed because hosted model versions change.",
         "",
         "## Condition-level results",
         "",
