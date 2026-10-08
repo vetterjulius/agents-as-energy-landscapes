@@ -230,8 +230,8 @@ def call_gemini(
     provider: str | None = None,
 ) -> tuple[str | None, Usage, float, float, int, str | None]:
     """Call Gemini directly, retry transient failures, and journal each attempt."""
-    if model != config.DEFAULT_MODEL:
-        return None, Usage(), 0.0, 0.0, 0, f"model_mismatch: only {config.DEFAULT_MODEL} is allowed"
+    if model not in config.ALLOWED_MODELS:
+        return None, Usage(), 0.0, 0.0, 0, f"model_mismatch: model {model!r} is not in allowed models {sorted(config.ALLOWED_MODELS)}"
     if provider not in (None, config.MODEL_PROVIDER):
         return None, Usage(), 0.0, 0.0, 0, f"provider_mismatch: only {config.MODEL_PROVIDER} is allowed"
     retry_limit = config.MAX_RETRIES
@@ -485,15 +485,15 @@ _MOCK_QUALITY = {  # slot_id -> base quality for on-specialization tasks
 
 
 def mock_worker(task: TaskSpec, slot: AgentSlot, prompt: str, rng,
-                dep_available: bool = True) -> WorkerOutput:
+                dep_available: bool = True, dep_coexecuted: bool = True) -> WorkerOutput:
     """Deterministic pseudo-worker.
 
     Quality model (design-time, fixed):
     - affinity between task embedding and slot capability (0..1, mean over dims)
       scales the base quality, so cross-functional dependency tasks are genuinely
       competitive on more than one slot;
-    - a missing upstream dependency costs one rubric level for dependent tasks
-      (coordination failure is visible, as in real pipelines);
+    - a missing upstream dependency costs quality (-0.45); cross-agent transfer
+      incurs a small coordination cost (-0.15) reflecting message passing overhead;
     - difficulty reduces quality; a deterministic hash jitter keeps runs
       reproducible without being degenerate.
     """
@@ -502,8 +502,11 @@ def mock_worker(task: TaskSpec, slot: AgentSlot, prompt: str, rng,
     affinity = float((cap * tmb).sum())  # both normalized to sum 1 -> cosine-like overlap
     base = 0.30 + 0.55 * affinity       # 0.30 (no overlap) .. 0.85 (perfect match)
     quality = base - 0.35 * task.difficulty
-    if task.depends_on is not None and not dep_available:
-        quality -= 0.45                 # coordination failure: lose ~1 rubric level
+    if task.depends_on is not None:
+        if not dep_available:
+            quality -= 0.45                 # missing dependency: lose ~1.5 rubric levels
+        elif not dep_coexecuted:
+            quality -= 0.15                 # cross-agent communication overhead: minor penalty
     quality = max(0.0, min(1.0, quality))
     digest = hashlib.sha256(f"{task.id}|{slot.id}|{prompt}".encode("utf-8")).digest()
     h = (int.from_bytes(digest[:4], "big") % 1000) / 1000.0
@@ -542,10 +545,14 @@ class ScoredTask:
 
 
 def build_task_prompt(task: TaskSpec, episode_tasks: EpisodeTasks,
-                      dep_answer: str | None) -> str:
+                      dep_answer: str | None, coexecuted: bool = True) -> str:
     text = task.prompt_template
     if task.depends_on is not None:
-        text = text.replace("{dep}", (dep_answer or "[upstream output unavailable]").strip()[:1200])
+        if dep_answer is not None:
+            prefix = "" if coexecuted else "[Cross-Agent Transferred Output]: "
+            text = text.replace("{dep}", f"{prefix}{dep_answer.strip()[:1200]}")
+        else:
+            text = text.replace("{dep}", "[upstream output unavailable]")
     return text.replace("{input}", episode_tasks.inputs[task.id] if task.id < len(
         episode_tasks.inputs) else "")
 
@@ -630,10 +637,9 @@ def execute_episode(
 ) -> EpisodeExecution:
     """Execute all assigned tasks with Layer-3 workers and score the outputs.
 
-    Dependency tasks receive the upstream answer ONLY if both tasks were assigned
-    to the same agent (co-execution is the mechanism the interaction term rewards);
-    otherwise the downstream task runs with the dependency marked unavailable --
-    mirroring the coordination hypothesis under test.
+    Dependency tasks receive the upstream answer. Co-executed tasks (same agent)
+    incur no transfer penalty; cross-agent transferred tasks receive an explicit
+    context header.
     """
     import numpy as np
     import torch
@@ -647,24 +653,26 @@ def execute_episode(
     ordered = sorted(episode_tasks.specs, key=lambda t: (t.depends_on is not None, t.id))
     for task in ordered:
         slot = slots[assigned_agent[task.id]]
+        model_to_use = slot.model or cfg.model
         dep_answer = None
+        dep_coexecuted = False
         if task.depends_on is not None:
-            if assigned_agent[task.depends_on] == assigned_agent[task.id] \
-                    and task.depends_on in raw_by_task:
+            if task.depends_on in raw_by_task:
                 dep_answer = raw_by_task[task.depends_on]
+                dep_coexecuted = (assigned_agent[task.depends_on] == assigned_agent[task.id])
         dep_available = dep_answer is not None
-        prompt = build_task_prompt(task, episode_tasks, dep_answer)
+        prompt = build_task_prompt(task, episode_tasks, dep_answer, coexecuted=dep_coexecuted)
         if cfg.worker_mode == "mock":
             rng = np.random.default_rng(derive_request_seed(
                 cfg.seed, block or episode_tasks.block, episode_tasks.episode,
                 repetition, task.id, "worker"))
-            out = mock_worker(task, slot, prompt, rng, dep_available=dep_available)
+            out = mock_worker(task, slot, prompt, rng, dep_available=dep_available, dep_coexecuted=dep_coexecuted)
         else:
             set_progress_context(condition=condition, block=block or episode_tasks.block,
                                  episode=episode_tasks.episode, repetition=repetition,
                                  task_id=task.id)
             text, usage, t_first, t_total, retries, err = _call_model(
-                prompt, slot.system_prompt, cfg.model, cfg.api_key,
+                prompt, slot.system_prompt, model_to_use, cfg.api_key,
                 temperature=cfg.worker_temperature, max_retries=cfg.max_retries,
                 seed=(derive_request_seed(cfg.seed, block or episode_tasks.block,
                                          episode_tasks.episode, repetition, task.id, "worker")

@@ -89,7 +89,8 @@ def test_summary_report_and_provenance_written(mock_run):
     assert summary["scorer"] == "rubric_proxy"
     assert summary["total_judge_calls"] == 0
     assert summary["total_judge_tokens"] == 0
-    assert summary["protocol"]["model_requested"] == "gemma-4-31b-it"
+    from llm_poc.config import ALLOWED_MODELS
+    assert summary["protocol"]["model_requested"] in ALLOWED_MODELS
     assert summary["protocol"]["provider_required"] == "google-ai-studio"
     assert summary["protocol"]["planned_worker_calls"] == 540
     assert "source_sha256" in summary["environment"]
@@ -98,9 +99,10 @@ def test_summary_report_and_provenance_written(mock_run):
 
 
 def test_live_protocol_is_direct_gemini_pilot_without_judge():
-    from llm_poc.config import DEFAULT_MODEL, MAX_LIVE_API_CALLS, PoCConfig
+    from llm_poc.config import DEFAULT_MODEL, ALLOWED_MODELS, MAX_LIVE_API_CALLS, PoCConfig
 
-    assert DEFAULT_MODEL == "gemma-4-31b-it"
+    assert DEFAULT_MODEL in ALLOWED_MODELS
+    assert "gemini-3.5-flash-lite" in ALLOWED_MODELS
     assert MAX_LIVE_API_CALLS == 60
     from llm_poc import config
     assert config.MIN_REQUEST_INTERVAL_SEC >= 60 / 30
@@ -113,8 +115,8 @@ def test_live_protocol_is_direct_gemini_pilot_without_judge():
     cfg = PoCConfig(worker_mode="gemini")
     assert cfg.judge_enabled is False
     assert cfg.api_key_env == "GEMINI_API_KEY"
-    with pytest.raises(ValueError, match="locked"):
-        PoCConfig(worker_mode="gemini", model="gemma-4-26b-a4b-it")
+    with pytest.raises(ValueError, match="allowed models"):
+        PoCConfig(worker_mode="gemini", model="invalid-model-name")
     with pytest.raises(ValueError, match="disables LLM judging"):
         PoCConfig(worker_mode="gemini", judge_enabled=True)
     with pytest.raises(ValueError, match="at most 3 retries"):
@@ -477,9 +479,9 @@ def test_resume_rejects_changed_request_for_a_started_task(tmp_path, monkeypatch
                         lambda req, timeout: (calls.append(1) or FakeResponse()))
     monkeypatch.setattr(workers.time, "sleep", lambda _: None)
     path = tmp_path / "mismatch.jsonl"
+    workers.set_progress_log(path)
     workers.set_progress_context(condition="baseline", block="stationary", episode=0,
                                 repetition=0, task_id=2)
-    workers.set_progress_log(path)
     workers.call_gemini("prompt-v1", "system", config.DEFAULT_MODEL,
                         "secret", max_retries=0)
     workers.set_progress_log(path, resume=True)

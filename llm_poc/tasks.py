@@ -22,12 +22,13 @@ from . import config
 
 @dataclass(frozen=True)
 class AgentSlot:
-    """One LLM agent slot (single fixed model, specialization via system prompt)."""
+    """One LLM agent slot (specialization via system prompt and optional per-agent model override)."""
     id: int
     name: str
     specialization: str
     system_prompt: str
     capability: tuple[float, ...]
+    model: str | None = None
 
 
 ANALYST_PROMPT = (
@@ -47,16 +48,28 @@ SYNTHESIST_PROMPT = (
 )
 
 
-def build_agent_slots() -> list[AgentSlot]:
+DEFAULT_AGENT_MODELS = {
+    "analyst": "gemini-3.5-flash-lite",
+    "extractor": "gemma-4-26b-a4b-it",
+    "synthesist": "gemini-2.5-flash",
+}
+
+
+def build_agent_slots(models: dict[str, str] | None = None) -> list[AgentSlot]:
+    models = models or {}
     e = torch.eye(config.D)
     analyst = e[0] + e[1] + e[2]            # dims 0-2
     extractor = e[3] + e[4] + e[5]          # dims 3-5
     synthesist = e[6] + e[7]                # dims 6-7
     return [
-        AgentSlot(0, "analyst", "analyze", ANALYST_PROMPT, tuple(analyst.tolist())),
-        AgentSlot(1, "extractor", "extract", EXTRACTOR_PROMPT, tuple(extractor.tolist())),
-        AgentSlot(2, "synthesist", "synthesize", SYNTHESIST_PROMPT, tuple(synthesist.tolist())),
+        AgentSlot(0, "analyst", "analyze", ANALYST_PROMPT, tuple(analyst.tolist()),
+                  model=models.get("analyst", models.get("analyze", DEFAULT_AGENT_MODELS["analyst"]))),
+        AgentSlot(1, "extractor", "extract", EXTRACTOR_PROMPT, tuple(extractor.tolist()),
+                  model=models.get("extractor", models.get("extract", DEFAULT_AGENT_MODELS["extractor"]))),
+        AgentSlot(2, "synthesist", "synthesize", SYNTHESIST_PROMPT, tuple(synthesist.tolist()),
+                  model=models.get("synthesist", models.get("synthesize", DEFAULT_AGENT_MODELS["synthesist"]))),
     ]
+
 
 
 @dataclass(frozen=True)

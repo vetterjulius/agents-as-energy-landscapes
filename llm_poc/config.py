@@ -15,6 +15,12 @@ MODEL_PROVIDER = "google-ai-studio"
 MODEL_CATALOG_SNAPSHOT = "Gemma 4 supported model per Google AI docs, checked 2026-10-06"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_MODEL = "gemma-4-26b-a4b-it"
+ALLOWED_MODELS = {
+    "gemma-4-26b-a4b-it",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+}
 API_TIMEOUT_SEC = 120.0
 MIN_REQUEST_INTERVAL_SEC = 2.2
 MAX_RETRIES = 3
@@ -169,10 +175,9 @@ class PoCConfig:
             self.judge_model = self.model
         if self.worker_mode not in {"mock", "gemini"}:
             raise ValueError("worker_mode must be 'mock' or 'gemini'")
-        if self.worker_mode == "gemini" and self.model != DEFAULT_MODEL:
+        if self.worker_mode == "gemini" and self.model not in ALLOWED_MODELS:
             raise ValueError(
-                f"Gemini pilot protocol is locked to {DEFAULT_MODEL}; "
-                "changing models requires a new protocol version"
+                f"Model {self.model!r} is not in allowed models: {sorted(ALLOWED_MODELS)}"
             )
         if self.worker_mode == "gemini" and self.protocol_version != EXPERIMENT_PROTOCOL_VERSION:
             raise ValueError("Gemini pilot protocol version mismatch")
