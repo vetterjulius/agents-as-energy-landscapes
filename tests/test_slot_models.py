@@ -8,5 +8,5 @@ def test_per_slot_model_overrides():
     })
     assert slots[0].model == "gemini-3.5-flash-lite"
     assert slots[1].model == "gemma-4-26b-a4b-it"
-    assert slots[2].model == "gemini-2.5-flash"
+    assert slots[2].model == "gemini-3.8-flash"
 

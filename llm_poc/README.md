@@ -24,7 +24,7 @@ The PoC uses three specialized agent slots, each mapped to a dedicated model opt
 
 1. **Analyst (Agent 0):** `gemini-3.5-flash-lite` (precise reasoning and problem breakdown; override via `--analyst-model`).
 2. **Extractor (Agent 1):** `gemma-4-26b-a4b-it` (meticulous data extraction; override via `--extractor-model`).
-3. **Synthesist (Agent 2):** `gemini-2.5-flash` (coherent synthesis; override via `--synthesist-model`).
+3. **Synthesist (Agent 2):** `gemini-3.8-flash` (coherent synthesis; override via `--synthesist-model`).
 
 ## Key and model
 

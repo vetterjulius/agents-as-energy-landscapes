@@ -18,8 +18,9 @@ DEFAULT_MODEL = "gemma-4-26b-a4b-it"
 ALLOWED_MODELS = {
     "gemma-4-26b-a4b-it",
     "gemini-3.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-1.5-flash",
+    #"gemini-2.5-flash",
+    #"gemini-1.5-flash",
+    "gemini-3.8-flash"
 }
 API_TIMEOUT_SEC = 120.0
 MIN_REQUEST_INTERVAL_SEC = 2.2

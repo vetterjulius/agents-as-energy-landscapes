@@ -51,7 +51,7 @@ SYNTHESIST_PROMPT = (
 DEFAULT_AGENT_MODELS = {
     "analyst": "gemini-3.5-flash-lite",
     "extractor": "gemma-4-26b-a4b-it",
-    "synthesist": "gemini-2.5-flash",
+    "synthesist": "gemini-3.8-flash",
 }
 
 
