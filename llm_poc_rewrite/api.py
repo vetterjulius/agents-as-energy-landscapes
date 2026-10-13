@@ -69,7 +69,13 @@ def generate(prompt: str, system_prompt: str, model: str, *, judge: bool = False
                 time.sleep(config.API_RETRY_BASE_SEC * (2 ** attempt))
                 continue
             raise RuntimeError(f"Gemini returned HTTP {exc.code}: {detail}") from None
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        except TimeoutError:
+            if attempt < config.API_MAX_RETRIES:
+                print(f"\nRetrying request after timeout. Attempt {attempt + 1} of {config.API_MAX_RETRIES} for model {model}. Waiting {config.API_RETRY_BASE_SEC * (2 ** attempt):.1f}s...\n")
+                time.sleep(config.API_RETRY_BASE_SEC * (2 ** attempt))
+                continue
+            raise RuntimeError("Gemini request timed out") from None
+        except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(f"Gemini request failed: {type(exc).__name__}: {exc}") from None
     else:
         raise RuntimeError("Gemini request exhausted retry attempts")

@@ -2,7 +2,7 @@
 
 MODEL_PROVIDER = "google-ai-studio"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-API_TIMEOUT_SEC = 180.0
+API_TIMEOUT_SEC = 240.0
 MIN_REQUEST_INTERVAL_SEC = 2.2
 API_MAX_RETRIES = 7
 API_RETRY_BASE_SEC = 2.0
