@@ -47,7 +47,7 @@ def test_generate_retries_5xx_with_exponential_backoff(monkeypatch):
                       for i in range(config.API_MAX_RETRIES)]
 
 
-def test_generate_stops_after_five_5xx_retries(monkeypatch):
+def test_generate_stops_after_configured_5xx_retries(monkeypatch):
     attempts = []
     delays = []
 
@@ -69,21 +69,21 @@ def test_generate_stops_after_five_5xx_retries(monkeypatch):
                       for i in range(config.API_MAX_RETRIES)]
 
 
-def test_generate_does_not_retry_non_5xx_http_errors(monkeypatch):
+def test_generate_does_not_retry_client_http_errors(monkeypatch):
     attempts = []
     delays = []
 
-    def fail_429(request, timeout):
+    def fail_400(request, timeout):
         attempts.append(1)
-        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, None)
+        raise urllib.error.HTTPError(request.full_url, 400, "Bad Request", {}, None)
 
     monkeypatch.setenv("GEMINI_API_KEY", "offline-test")
     monkeypatch.setattr(api, "_last_request_at", 0.0)
     monkeypatch.setattr(config, "MIN_REQUEST_INTERVAL_SEC", 0)
-    monkeypatch.setattr(api.urllib.request, "urlopen", fail_429)
+    monkeypatch.setattr(api.urllib.request, "urlopen", fail_400)
     monkeypatch.setattr(api.time, "sleep", delays.append)
 
-    with pytest.raises(RuntimeError, match="HTTP 429"):
+    with pytest.raises(RuntimeError, match="HTTP 400"):
         api.generate("prompt", "system", config.AGENT_MODELS["analyst"])
 
     assert len(attempts) == 1
