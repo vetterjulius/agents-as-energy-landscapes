@@ -70,9 +70,14 @@ def test_resume_reuses_worker_result_when_judging_was_interrupted(tmp_path, monk
         judge_calls.append(candidate)
         if len(judge_calls) == 2:
             raise RuntimeError("simulated interruption after worker response")
-        return 1, Generation("1", config.JUDGE_MODEL, 1, 1, 0.01), None
+        return 1, Generation(
+            "1", config.JUDGE_MODEL, 1, 1, 0.01, finish_reason="STOP",
+        ), None
 
     monkeypatch.setattr(run, "score", interrupted_then_successful_score)
+    monkeypatch.setattr(run.judge, "preflight", lambda **kwargs: Generation(
+        "2", config.JUDGE_MODEL, 1, 1, 0.01, finish_reason="STOP",
+    ))
     resume_flags = iter((False, True))
     monkeypatch.setattr(
         run, "parse_args",

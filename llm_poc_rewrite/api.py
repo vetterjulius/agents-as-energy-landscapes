@@ -18,6 +18,9 @@ class Generation:
     prompt_tokens: int
     completion_tokens: int
     latency_seconds: float
+    finish_reason: str = ""
+    thoughts_tokens: int = 0
+    total_tokens: int = 0
 
 
 _last_request_at = 0.0
@@ -34,15 +37,20 @@ def generate(prompt: str, system_prompt: str, model: str, *, judge: bool = False
         raise RuntimeError("GEMINI_API_KEY is missing")
 
     max_tokens = config.JUDGE_MAX_TOKENS if judge else config.WORKER_MAX_TOKENS
+    generation_config = {
+        "temperature": config.JUDGE_TEMPERATURE if judge else config.WORKER_TEMPERATURE,
+        "topP": 1.0,
+        "maxOutputTokens": max_tokens,
+        "seed": seed,
+    }
+    if judge:
+        generation_config["thinkingConfig"] = {
+            "thinkingLevel": config.JUDGE_THINKING_LEVEL,
+        }
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "generationConfig": {
-            "temperature": config.JUDGE_TEMPERATURE if judge else config.WORKER_TEMPERATURE,
-            "topP": 1.0,
-            "maxOutputTokens": max_tokens,
-            "seed": seed,
-        },
+        "generationConfig": generation_config,
     }
     request = urllib.request.Request(
         config.GEMINI_API_URL.format(model=model),
@@ -81,9 +89,11 @@ def generate(prompt: str, system_prompt: str, model: str, *, judge: bool = False
         raise RuntimeError("Gemini request exhausted retry attempts")
 
     candidates = body.get("candidates") or []
-    parts = (candidates[0].get("content") or {}).get("parts", []) if candidates else []
+    candidate = candidates[0] if candidates else {}
+    parts = (candidate.get("content") or {}).get("parts", []) if candidate else []
     text = "".join(part.get("text", "") for part in parts if isinstance(part, dict))
-    if not text:
+    finish_reason = str(candidate.get("finishReason", "")) if candidate else ""
+    if not text and not judge:
         raise RuntimeError("Gemini response did not contain generated text")
     model_version = str(body.get("modelVersion", ""))
     if model_version and model_version != model and not model_version.startswith(model + "-"):
@@ -95,4 +105,7 @@ def generate(prompt: str, system_prompt: str, model: str, *, judge: bool = False
         prompt_tokens=int(usage.get("promptTokenCount", 0)),
         completion_tokens=int(usage.get("candidatesTokenCount", 0)),
         latency_seconds=time.perf_counter() - started,
+        finish_reason=finish_reason,
+        thoughts_tokens=int(usage.get("thoughtsTokenCount", 0)),
+        total_tokens=int(usage.get("totalTokenCount", 0)),
     )

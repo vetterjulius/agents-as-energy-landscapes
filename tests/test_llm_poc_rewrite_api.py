@@ -19,7 +19,16 @@ class FakeResponse:
     def read(self):
         return json.dumps({
             "modelVersion": config.AGENT_MODELS["analyst"],
-            "candidates": [{"content": {"parts": [{"text": "ok"}]}}],
+            "candidates": [{
+                "content": {"parts": [{"text": "ok"}]},
+                "finishReason": "STOP",
+            }],
+            "usageMetadata": {
+                "promptTokenCount": 3,
+                "candidatesTokenCount": 1,
+                "thoughtsTokenCount": 0,
+                "totalTokenCount": 4,
+            },
         }).encode()
 
 

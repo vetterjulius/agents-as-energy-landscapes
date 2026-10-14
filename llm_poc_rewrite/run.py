@@ -17,6 +17,7 @@ import torch
 
 from . import config
 from .api import Generation, generate
+from . import judge
 from .judge import score
 from .orchestration import make_initial_state, orchestrate
 from .tasks import build_agent_slots, build_episode, declared_dependency_pairs
@@ -65,6 +66,9 @@ def _checkpoint_design() -> dict:
     return {
         "agent_models": config.AGENT_MODELS,
         "judge_model": config.JUDGE_MODEL,
+        "judge_protocol_version": config.JUDGE_PROTOCOL_VERSION,
+        "judge_max_tokens": config.JUDGE_MAX_TOKENS,
+        "judge_thinking_level": config.JUDGE_THINKING_LEVEL,
         "conditions": list(config.CONDITIONS),
         "blocks": list(config.BLOCKS),
         "episodes": config.N_EPISODES,
@@ -118,6 +122,7 @@ def _new_checkpoint() -> dict:
         "status": "running",
         "design": _checkpoint_design(),
         "started_at": time.time(),
+        "judge_preflight_calls": 0,
         "rows": [],
         "pending": None,
     }
@@ -164,8 +169,8 @@ def main():
         raise RuntimeError("Fixed run design does not match the protocol call totals")
     print(
         f"Fixed design: {workers} worker calls + {judges} judge calls "
-        f"= {workers + judges} Gemini API calls; agents={config.AGENT_MODELS}; "
-        f"judge={config.JUDGE_MODEL}"
+        f"+ 1 judge preflight = {workers + judges + 1} planned Gemini API calls on a fresh run; "
+        f"agents={config.AGENT_MODELS}; judge={config.JUDGE_MODEL}"
     )
     print(f"conditions={config.CONDITIONS}; Blocks={config.BLOCKS};")
     if args.plan_only:
@@ -185,7 +190,6 @@ def main():
                 f"Checkpoint already exists at {checkpoint_path}; use --resume or choose a new --output-dir"
             )
         checkpoint = _new_checkpoint()
-        _write_checkpoint(checkpoint_path, checkpoint)
     rows: list[dict] = checkpoint["rows"]
     expected_keys = {
         _task_key(condition, block, episode, repetition, task_id)
@@ -196,8 +200,28 @@ def main():
         for task_id in range(config.N_TASKS)
     }
     completed_by_key = _validate_checkpoint_rows(checkpoint, expected_keys)
-    slots = build_agent_slots()
     base_seed = 20260923
+    try:
+        preflight_generation = judge.preflight(
+            seed=_request_seed(base_seed, "stationary", 0, 0, 0, "judge-preflight"),
+        )
+    except RuntimeError as exc:
+        checkpoint["judge_preflight_calls"] = checkpoint.get("judge_preflight_calls", 0) + 1
+        checkpoint["judge_preflight_error"] = str(exc)
+        if not args.resume:
+            _write_checkpoint(checkpoint_path, checkpoint)
+        elif checkpoint["judge_preflight_calls"] > 1 or checkpoint.get("rows") or checkpoint.get("pending"):
+            _write_checkpoint(checkpoint_path, checkpoint)
+        raise
+    checkpoint["judge_preflight_calls"] = checkpoint.get("judge_preflight_calls", 0) + 1
+    checkpoint.pop("judge_preflight_error", None)
+    _write_checkpoint(checkpoint_path, checkpoint)
+    print(
+        f"Judge preflight passed: score output validated; "
+        f"finishReason={preflight_generation.finish_reason}; "
+        f"tokens={preflight_generation.completion_tokens}"
+    )
+    slots = build_agent_slots()
     random.seed(base_seed)
     np.random.seed(base_seed)
     torch.manual_seed(base_seed)
@@ -254,10 +278,30 @@ def main():
                             }
                             _write_checkpoint(checkpoint_path, checkpoint)
                         outputs[task.id] = worker.text[:1200]
-                        level, judge, judge_error = score(
-                            task, worker.text, task_prompt=prompt,
-                            seed=_request_seed(base_seed, block, episode, repetition, task.id, "judge"),
-                        )
+                        try:
+                            level, judge_generation, judge_error = score(
+                                task, worker.text, task_prompt=prompt,
+                                seed=_request_seed(base_seed, block, episode, repetition, task.id, "judge"),
+                            )
+                        except Exception as exc:
+                            checkpoint["pending"]["judge_failure"] = {
+                                "error": f"{type(exc).__name__}: {exc}",
+                            }
+                            _write_checkpoint(checkpoint_path, checkpoint)
+                            raise
+                        if judge_error is not None:
+                            checkpoint["pending"]["judge_failure"] = {
+                                "generation": asdict(judge_generation),
+                                "error": judge_error,
+                            }
+                            _write_checkpoint(checkpoint_path, checkpoint)
+                            raise RuntimeError(
+                                f"Judge validation failed for task {key}; "
+                                f"finishReason={judge_generation.finish_reason or 'missing'}, "
+                                f"thoughtsTokens={judge_generation.thoughts_tokens}, "
+                                f"completionTokens={judge_generation.completion_tokens}, "
+                                f"output={judge_generation.text!r}: {judge_error}"
+                            )
                         row = {
                             "condition": condition,
                             "block": block,
@@ -273,14 +317,17 @@ def main():
                             "worker_completion_tokens": worker.completion_tokens,
                             "worker_latency_seconds": worker.latency_seconds,
                             "judge_model": config.JUDGE_MODEL,
-                            "judge_model_version": judge.model_version,
+                            "judge_model_version": judge_generation.model_version,
+                            "judge_finish_reason": judge_generation.finish_reason,
+                            "judge_thoughts_tokens": judge_generation.thoughts_tokens,
+                            "judge_total_tokens": judge_generation.total_tokens,
                             "judge_level": level,
                             "judge_normalized_score": level / max(1, len(task.rubric) - 1),
-                            "judge_raw_text": judge.text,
-                            "judge_error": judge_error or "",
-                            "judge_prompt_tokens": judge.prompt_tokens,
-                            "judge_completion_tokens": judge.completion_tokens,
-                            "judge_latency_seconds": judge.latency_seconds,
+                            "judge_raw_text": judge_generation.text,
+                            "judge_error": "",
+                            "judge_prompt_tokens": judge_generation.prompt_tokens,
+                            "judge_completion_tokens": judge_generation.completion_tokens,
+                            "judge_latency_seconds": judge_generation.latency_seconds,
                         }
                         rows.append(row)
                         completed_by_key[key] = row
@@ -297,14 +344,27 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     judge_errors = sum(bool(row["judge_error"]) for row in rows)
+    if judge_errors:
+        raise RuntimeError(f"Refusing to finalize results with {judge_errors} invalid judge rows")
 
     summary = {
         "status": "hypothesis-generating transfer pilot; not a confirmatory benchmark",
         "judge_parse_errors": judge_errors,
-        "judge_parse_error_policy": "retain raw judge output and use conservative score 0",
+        "judge_parse_error_policy": "abort before recording a task row if a judge response is invalid",
+        "judge_protocol_version": config.JUDGE_PROTOCOL_VERSION,
+        "judge_preflight": {
+            "passed": True,
+            "finish_reason": preflight_generation.finish_reason,
+            "prompt_tokens": preflight_generation.prompt_tokens,
+            "completion_tokens": preflight_generation.completion_tokens,
+            "thoughts_tokens": preflight_generation.thoughts_tokens,
+            "total_tokens": preflight_generation.total_tokens,
+        },
         "worker_calls": workers,
         "judge_calls": judges,
-        "total_gemini_api_calls": workers + judges,
+        "judge_preflight_calls": checkpoint["judge_preflight_calls"],
+        "total_task_api_calls": workers + judges,
+        "total_gemini_api_calls": workers + judges + checkpoint["judge_preflight_calls"],
         "agent_models": config.AGENT_MODELS,
         "judge_model": config.JUDGE_MODEL,
         "conditions": config.CONDITIONS,
