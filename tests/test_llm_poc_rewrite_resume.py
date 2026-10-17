@@ -42,6 +42,7 @@ def test_resume_reuses_worker_result_when_judging_was_interrupted(tmp_path, monk
     monkeypatch.setattr(config, "N_REPETITIONS", 1)
     monkeypatch.setattr(config, "N_TASKS", 2)
     monkeypatch.setattr(config, "EXPECTED_WORKER_CALLS", 2)
+    monkeypatch.setattr(config, "LLM_JUDGE_TASK_IDS", (0, 1))
     monkeypatch.setattr(config, "EXPECTED_JUDGE_CALLS", 2)
     monkeypatch.setattr(run.torch, "use_deterministic_algorithms", lambda enabled: None)
 
@@ -53,7 +54,7 @@ def test_resume_reuses_worker_result_when_judging_was_interrupted(tmp_path, monk
     episode = EpisodeTasks(specs=specs, inputs=["input-0", "input-1"])
     monkeypatch.setattr(run, "build_episode", lambda block, index: episode)
     monkeypatch.setattr(run, "declared_dependency_pairs", lambda block, index: [])
-    monkeypatch.setattr(run, "make_initial_state", lambda tasks, dependencies: object())
+    monkeypatch.setattr(run, "make_initial_state", lambda tasks: object())
     assignment = SimpleNamespace(X=torch.tensor([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]))
     monkeypatch.setattr(run, "orchestrate", lambda *args: (assignment, object()))
 
@@ -74,6 +75,7 @@ def test_resume_reuses_worker_result_when_judging_was_interrupted(tmp_path, monk
             "1", config.JUDGE_MODEL, 1, 1, 0.01, finish_reason="STOP",
         ), None
 
+    monkeypatch.setattr(run, "is_deterministic_task", lambda task_id: False)
     monkeypatch.setattr(run, "score", interrupted_then_successful_score)
     monkeypatch.setattr(run.judge, "preflight", lambda **kwargs: Generation(
         "2", config.JUDGE_MODEL, 1, 1, 0.01, finish_reason="STOP",

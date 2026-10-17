@@ -19,17 +19,64 @@ from . import config
 from .api import Generation, generate
 from . import judge
 from .judge import score
-from .orchestration import make_initial_state, orchestrate
+from .scoring import deterministic_score, is_deterministic_task
+from .orchestration import (
+    make_initial_state,
+    make_real_issue_initial_state,
+    orchestrate,
+    orchestrate_real_issue,
+    orchestration_diagnostic,
+)
 from .tasks import build_agent_slots, build_episode, declared_dependency_pairs
 
 
 def planned_call_counts() -> tuple[int, int]:
     """Return the fixed worker and judge request counts before any API request."""
-    worker_calls = (
-        len(config.CONDITIONS) * len(config.BLOCKS) * config.N_EPISODES
-        * config.N_REPETITIONS * config.N_TASKS
+    episodes = len(config.CONDITIONS) * len(config.BLOCKS) * config.N_EPISODES * config.N_REPETITIONS
+    worker_calls = episodes * config.N_TASKS
+    judge_calls = episodes * len(config.LLM_JUDGE_TASK_IDS)
+    return worker_calls, judge_calls
+
+
+def planned_real_issue_patch_calls() -> int:
+    """Return the real-issue pilot's proposed patch-generation count, excluding retries."""
+    return (
+        len(config.CONDITIONS) * config.N_REPETITIONS
+        * len(config.REAL_ISSUE_TASK_IDS) * config.REAL_ISSUE_EPISODES
     )
-    return worker_calls, worker_calls
+
+
+def real_issue_episode_diagnostics(condition: str, seed: int) -> list[dict]:
+    """Run a clearly synthetic, offline two-episode mechanism diagnostic only."""
+    from .tasks import EpisodeTasks, TaskSpec
+
+    specs = [
+        TaskSpec(i, "patch", (0.0,) * config.D, 0.0, "", "", (), None)
+        for i in range(len(config.REAL_ISSUE_TASK_IDS))
+    ]
+    slots = build_agent_slots()
+    state = make_real_issue_initial_state(EpisodeTasks(specs=specs))
+    records = []
+    for episode_index in range(config.REAL_ISSUE_EPISODES):
+        episode = EpisodeTasks(specs=specs, episode=episode_index, block="real_issue")
+        result, next_state = orchestrate_real_issue(
+            condition, slots, episode, state, rng_seed=seed + episode_index,
+        )
+        record = orchestration_diagnostic(
+            result, evaluator_theta=torch.tensor(config.REAL_ISSUE_G1),
+        )
+        record.update({
+            "episode": episode_index,
+            "task_to_slot": torch.argmax(result.X.float(), dim=0).tolist(),
+            "next_theta": next_state.Theta.tolist(),
+            "graph_update_source": "assignment_history_only",
+            "co_assignment_prior": "heuristic_not_empirically_validated",
+            "positive_edge_means_shared_agent": True,
+            "assignment_synergy_validated": False,
+        })
+        records.append(record)
+        state = next_state
+    return records
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,6 +85,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plan-only", action="store_true",
         help="show the fixed design and call counts without making API requests",
+    )
+    parser.add_argument(
+        "--real-issue-plan-only", action="store_true",
+        help="show the gated two-issue pilot design and request count without API calls",
     )
     parser.add_argument(
         "--resume", action="store_true",
@@ -69,11 +120,13 @@ def _checkpoint_design() -> dict:
         "judge_protocol_version": config.JUDGE_PROTOCOL_VERSION,
         "judge_max_tokens": config.JUDGE_MAX_TOKENS,
         "judge_thinking_level": config.JUDGE_THINKING_LEVEL,
+        "llm_judge_task_ids": list(config.LLM_JUDGE_TASK_IDS),
         "conditions": list(config.CONDITIONS),
         "blocks": list(config.BLOCKS),
         "episodes": config.N_EPISODES,
         "repetitions": config.N_REPETITIONS,
         "tasks": config.N_TASKS,
+        "scoring_version": config.SCORING_PROTOCOL_VERSION,
     }
 
 
@@ -164,6 +217,25 @@ def main():
     except ImportError:
         pass
     args = parse_args()
+    if getattr(args, "real_issue_plan_only", False):
+        planned = planned_real_issue_patch_calls()
+        if planned != config.REAL_ISSUE_EXPECTED_PATCH_CALLS:
+            raise RuntimeError("Real-issue pilot request count does not match its fixed design")
+        print(
+            "Real-issue pilot design only: "
+            f"tasks={config.REAL_ISSUE_TASK_IDS}; G0={config.REAL_ISSUE_G0}; "
+            f"G1={config.REAL_ISSUE_G1}; episodes={config.REAL_ISSUE_EPISODES}; "
+            f"conditions={config.CONDITIONS}; repetitions={config.N_REPETITIONS}; "
+            f"adaptive_mode={config.REAL_ISSUE_ADAPTATION_MODE}; "
+            "edge_semantics=unvalidated_same-agent heuristic; "
+            f"planned_patch_generations={planned}; judge_calls=0; preflight_calls=0; "
+            "API requests=0; live run remains gated on validated vectors and historical tests; "
+            "the following trace uses synthetic role vectors and is mechanism-only."
+        )
+        for condition in config.CONDITIONS:
+            for record in real_issue_episode_diagnostics(condition, seed=912):
+                print(json.dumps(record))
+        return 0
     workers, judges = planned_call_counts()
     if (workers, judges) != (config.EXPECTED_WORKER_CALLS, config.EXPECTED_JUDGE_CALLS):
         raise RuntimeError("Fixed run design does not match the protocol call totals")
@@ -236,9 +308,9 @@ def main():
                 tasks = build_episode(block, episode)
                 dependencies = declared_dependency_pairs(block, episode)
                 if state is None:
-                    state = make_initial_state(tasks, dependencies)
+                    state = make_initial_state(tasks)
                 assignment, next_state = orchestrate(
-                    condition, slots, tasks, dependencies, state,
+                    condition, slots, tasks, state,
                     base_seed * 100000 + episode * 1000,
                 )
                 assignments = torch.argmax(assignment.X.float(), dim=0).tolist()
@@ -278,56 +350,71 @@ def main():
                             }
                             _write_checkpoint(checkpoint_path, checkpoint)
                         outputs[task.id] = worker.text[:1200]
-                        try:
-                            level, judge_generation, judge_error = score(
-                                task, worker.text, task_prompt=prompt,
-                                seed=_request_seed(base_seed, block, episode, repetition, task.id, "judge"),
-                            )
-                        except Exception as exc:
-                            checkpoint["pending"]["judge_failure"] = {
-                                "error": f"{type(exc).__name__}: {exc}",
-                            }
-                            _write_checkpoint(checkpoint_path, checkpoint)
-                            raise
-                        if judge_error is not None:
-                            checkpoint["pending"]["judge_failure"] = {
-                                "generation": asdict(judge_generation),
-                                "error": judge_error,
-                            }
-                            _write_checkpoint(checkpoint_path, checkpoint)
-                            raise RuntimeError(
-                                f"Judge validation failed for task {key}; "
-                                f"finishReason={judge_generation.finish_reason or 'missing'}, "
-                                f"thoughtsTokens={judge_generation.thoughts_tokens}, "
-                                f"completionTokens={judge_generation.completion_tokens}, "
-                                f"output={judge_generation.text!r}: {judge_error}"
-                            )
+                        judge_generation = None
+                        if is_deterministic_task(task.id):
+                            level, judge_error = deterministic_score(task, worker.text)
+                            if judge_error is not None:
+                                checkpoint["pending"]["scoring_failure"] = {"error": judge_error}
+                                _write_checkpoint(checkpoint_path, checkpoint)
+                                raise RuntimeError(f"Deterministic scoring failed for task {key}: {judge_error}")
+                        else:
+                            try:
+                                level, judge_generation, judge_error = score(
+                                    task, worker.text, task_prompt=prompt,
+                                    seed=_request_seed(base_seed, block, episode, repetition, task.id, "judge"),
+                                )
+                            except Exception as exc:
+                                checkpoint["pending"]["judge_failure"] = {
+                                    "error": f"{type(exc).__name__}: {exc}",
+                                }
+                                _write_checkpoint(checkpoint_path, checkpoint)
+                                raise
+                            if judge_error is not None:
+                                checkpoint["pending"]["judge_failure"] = {
+                                    "generation": asdict(judge_generation),
+                                    "error": judge_error,
+                                }
+                                _write_checkpoint(checkpoint_path, checkpoint)
+                                raise RuntimeError(
+                                    f"Judge validation failed for task {key}; "
+                                    f"finishReason={judge_generation.finish_reason or 'missing'}, "
+                                    f"thoughtsTokens={judge_generation.thoughts_tokens}, "
+                                    f"completionTokens={judge_generation.completion_tokens}, "
+                                    f"output={judge_generation.text!r}: {judge_error}"
+                                )
                         row = {
                             "condition": condition,
                             "block": block,
                             "episode": episode,
                             "repetition": repetition,
                             "task_id": task.id,
+                            "dependency_upstream": task.depends_on,
                             "agent_id": agent.id,
                             "agent": agent.name,
                             "worker_model": agent.model,
                             "worker_model_version": worker.model_version,
                             "worker_text": worker.text,
+                            "task_reference_answer": task.reference_answer,
+                            "task_dependencies": ",".join(
+                                f"{upstream}->{downstream}" for upstream, downstream in dependencies
+                                if task.id in (upstream, downstream)
+                            ),
                             "worker_prompt_tokens": worker.prompt_tokens,
                             "worker_completion_tokens": worker.completion_tokens,
                             "worker_latency_seconds": worker.latency_seconds,
-                            "judge_model": config.JUDGE_MODEL,
-                            "judge_model_version": judge_generation.model_version,
-                            "judge_finish_reason": judge_generation.finish_reason,
-                            "judge_thoughts_tokens": judge_generation.thoughts_tokens,
-                            "judge_total_tokens": judge_generation.total_tokens,
+                            "scoring_method": "llm_judge" if judge_generation else "deterministic",
+                            "judge_model": config.JUDGE_MODEL if judge_generation else "",
+                            "judge_model_version": judge_generation.model_version if judge_generation else "",
+                            "judge_finish_reason": judge_generation.finish_reason if judge_generation else "",
+                            "judge_thoughts_tokens": judge_generation.thoughts_tokens if judge_generation else 0,
+                            "judge_total_tokens": judge_generation.total_tokens if judge_generation else 0,
                             "judge_level": level,
                             "judge_normalized_score": level / max(1, len(task.rubric) - 1),
-                            "judge_raw_text": judge_generation.text,
+                            "judge_raw_text": judge_generation.text if judge_generation else "",
                             "judge_error": "",
-                            "judge_prompt_tokens": judge_generation.prompt_tokens,
-                            "judge_completion_tokens": judge_generation.completion_tokens,
-                            "judge_latency_seconds": judge_generation.latency_seconds,
+                            "judge_prompt_tokens": judge_generation.prompt_tokens if judge_generation else 0,
+                            "judge_completion_tokens": judge_generation.completion_tokens if judge_generation else 0,
+                            "judge_latency_seconds": judge_generation.latency_seconds if judge_generation else 0.0,
                         }
                         rows.append(row)
                         completed_by_key[key] = row
@@ -346,11 +433,17 @@ def main():
     judge_errors = sum(bool(row["judge_error"]) for row in rows)
     if judge_errors:
         raise RuntimeError(f"Refusing to finalize results with {judge_errors} invalid judge rows")
+    judge_rows = sum(row["scoring_method"] == "llm_judge" for row in rows)
+    if judge_rows != judges:
+        raise RuntimeError(f"Expected {judges} semantic judge scores, got {judge_rows}")
 
     summary = {
         "status": "hypothesis-generating transfer pilot; not a confirmatory benchmark",
         "judge_parse_errors": judge_errors,
-        "judge_parse_error_policy": "abort before recording a task row if a judge response is invalid",
+        "scoring_errors": judge_errors,
+        "judge_parse_error_policy": "abort before recording a task row if a semantic judge response is invalid",
+        "scoring_protocol_version": config.SCORING_PROTOCOL_VERSION,
+        "scoring_protocol": "exact deterministic checks for objective tasks; LLM judge only for synthesis tasks 7 and 9",
         "judge_protocol_version": config.JUDGE_PROTOCOL_VERSION,
         "judge_preflight": {
             "passed": True,
@@ -362,6 +455,7 @@ def main():
         },
         "worker_calls": workers,
         "judge_calls": judges,
+        "deterministic_task_scores": workers - judges,
         "judge_preflight_calls": checkpoint["judge_preflight_calls"],
         "total_task_api_calls": workers + judges,
         "total_gemini_api_calls": workers + judges + checkpoint["judge_preflight_calls"],

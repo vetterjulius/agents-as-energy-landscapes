@@ -160,6 +160,7 @@ def test_preflight_failure_stops_before_any_worker_call(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "N_EPISODES", 1)
     monkeypatch.setattr(config, "N_REPETITIONS", 1)
     monkeypatch.setattr(config, "N_TASKS", 1)
+    monkeypatch.setattr(config, "LLM_JUDGE_TASK_IDS", (0,))
     monkeypatch.setattr(config, "EXPECTED_WORKER_CALLS", 1)
     monkeypatch.setattr(config, "EXPECTED_JUDGE_CALLS", 1)
     monkeypatch.setattr(run, "parse_args", lambda: Namespace(
@@ -192,6 +193,7 @@ def test_invalid_task_judge_result_is_not_saved_as_a_zero_score(tmp_path, monkey
     monkeypatch.setattr(config, "N_EPISODES", 1)
     monkeypatch.setattr(config, "N_REPETITIONS", 1)
     monkeypatch.setattr(config, "N_TASKS", 1)
+    monkeypatch.setattr(config, "LLM_JUDGE_TASK_IDS", (0,))
     monkeypatch.setattr(config, "EXPECTED_WORKER_CALLS", 1)
     monkeypatch.setattr(config, "EXPECTED_JUDGE_CALLS", 1)
     monkeypatch.setattr(run, "parse_args", lambda: Namespace(
@@ -208,7 +210,7 @@ def test_invalid_task_judge_result_is_not_saved_as_a_zero_score(tmp_path, monkey
         "Episode", (), {"specs": [task], "inputs": ["4270"]}
     )())
     monkeypatch.setattr(run, "declared_dependency_pairs", lambda *args: [])
-    monkeypatch.setattr(run, "make_initial_state", lambda *args: object())
+    monkeypatch.setattr(run, "make_initial_state", lambda tasks: object())
     assignment = type("Assignment", (), {"X": torch.tensor([[1.0], [0.0], [0.0]])})()
     monkeypatch.setattr(run, "orchestrate", lambda *args: (assignment, object()))
     monkeypatch.setattr(run.judge, "preflight", lambda **kwargs: Generation(
@@ -217,6 +219,7 @@ def test_invalid_task_judge_result_is_not_saved_as_a_zero_score(tmp_path, monkey
     monkeypatch.setattr(run, "generate", lambda *args, **kwargs: Generation(
         "4270", config.AGENT_MODELS["analyst"], 1, 1, 0.01,
     ))
+    monkeypatch.setattr(run, "is_deterministic_task", lambda task_id: False)
     monkeypatch.setattr(run, "score", lambda *args, **kwargs: (
         None,
         Generation("* Data:", config.JUDGE_MODEL, 1, 0, 0.01, finish_reason="MAX_TOKENS"),

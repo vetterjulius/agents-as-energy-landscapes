@@ -20,6 +20,7 @@ WORKER_MAX_TOKENS = 512
 JUDGE_MAX_TOKENS = 32
 JUDGE_THINKING_LEVEL = "minimal"
 JUDGE_PROTOCOL_VERSION = "gemma4-judge-minimal-thinking-v2"
+SCORING_PROTOCOL_VERSION = "episode-gold-exact-v1"
 
 N_AGENTS = 3
 N_TASKS = 10
@@ -29,7 +30,24 @@ N_REPETITIONS = 3
 BLOCKS = ("stationary", "shift_mid")
 CONDITIONS = ("baseline", "static_energy", "adaptive_energy")
 EXPECTED_WORKER_CALLS = len(CONDITIONS) * len(BLOCKS) * N_EPISODES * N_REPETITIONS * N_TASKS
-EXPECTED_JUDGE_CALLS = EXPECTED_WORKER_CALLS
+
+# Fixed-node historical transfer design; never used by the normal run.
+# The positive G0 edge is an unvalidated co-assignment heuristic, not a finding.
+REAL_ISSUE_TASK_IDS = ("gensim-3525", "flair-3441")
+REAL_ISSUE_TASK_COUNT = len(REAL_ISSUE_TASK_IDS)
+REAL_ISSUE_G0 = ((0.0, 1.0), (1.0, 0.0))
+REAL_ISSUE_G1 = ((0.0, 0.0), (0.0, 0.0))
+REAL_ISSUE_ADAPTATION_MODE = "theta-only"
+REAL_ISSUE_EPISODES = 2
+REAL_ISSUE_EXPECTED_PATCH_CALLS = (
+    len(CONDITIONS) * N_REPETITIONS * len(REAL_ISSUE_TASK_IDS) * REAL_ISSUE_EPISODES
+)
+# Tasks 7 and 9 are semantic synthesis tasks; other task outputs have deterministic checks.
+LLM_JUDGE_TASK_IDS = (7, 9)
+EXPECTED_JUDGE_CALLS = (
+    len(CONDITIONS) * len(BLOCKS) * N_EPISODES * N_REPETITIONS
+    * len(LLM_JUDGE_TASK_IDS)
+)
 
 LAMBDA_ALIGN = 0.5
 LAMBDA_MEMORY = 0.5
