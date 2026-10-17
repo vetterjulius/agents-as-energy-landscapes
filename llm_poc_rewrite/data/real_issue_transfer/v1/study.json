@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "study_id": "real-issue-transfer-v1",
+  "status": "draft",
+  "created_at_utc": "2026-10-17T00:00:00Z",
+  "aim": "Assess feasibility and exploratory transfer of the orchestration approach to real, reproducible software issue tasks.",
+  "cohort": {
+    "target_min": 4,
+    "target_max": 8,
+    "repository": null,
+    "intake_start": null,
+    "intake_end": null
+  },
+  "conditions": ["baseline", "static_energy", "adaptive_energy"],
+  "evaluation": {
+    "primary_contrast": "adaptive_energy_vs_static_energy",
+    "secondary_contrast": "baseline_descriptive",
+    "repetitions": 2,
+    "task_success_requires": ["patch_applies", "base_test_fails", "trusted_fix_test_passes"],
+    "sandbox_required": true,
+    "api_budget_usd": null,
+    "worker_skill_routing_claim": false
+  },
+  "claim_limits": [
+    "Exploratory feasibility and transfer only; not a powered superiority claim.",
+    "A temporal graph change is not required and tracker links are not causal proof.",
+    "No skill-aware routing claim without a reviewed feature schema and capability evidence.",
+    "No live issue cohort, patch runner, or hidden-test harness has been selected or implemented yet."
+  ]
+}
