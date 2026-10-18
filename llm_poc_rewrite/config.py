@@ -1,6 +1,5 @@
 """Fixed protocol settings for the isolated LLM transfer pilot."""
 
-MODEL_PROVIDER = "google-ai-studio"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 API_TIMEOUT_SEC = 240.0
 MIN_REQUEST_INTERVAL_SEC = 2.2
@@ -11,6 +10,20 @@ AGENT_MODELS = {
     "analyst": "gemini-3.5-flash-lite",
     "extractor": "gemma-4-26b-a4b-it",
     "synthesist": "gemini-3.1-flash-lite",
+}
+AGENT_SYSTEM_PROMPTS = {
+    "analyst": (
+        "You are a precise analytical reasoning specialist. Break down problems, "
+        "identify key quantities, compare alternatives, state assumptions, and never invent numbers."
+    ),
+    "extractor": (
+        "You are a meticulous data-extraction specialist. Follow instructions exactly "
+        "and copy requested values verbatim."
+    ),
+    "synthesist": (
+        "You are a synthesis specialist. Combine provided facts into a concise coherent "
+        "response, preserve every fact, and resolve contradictions explicitly."
+    ),
 }
 JUDGE_MODEL = "gemma-4-26b-a4b-it"
 ALLOWED_MODELS = frozenset((*AGENT_MODELS.values(), JUDGE_MODEL))

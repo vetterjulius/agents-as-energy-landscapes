@@ -1,6 +1,6 @@
 # Isolated LLM PoC rewrite
 
-This folder is a minimal, standalone replacement candidate for the existing LLM PoC. It does not modify the simulated benchmark or its energy formulations, and it is not intended to implement the paper's main benchmark a second time. It reuses the existing frozen orchestration and task definitions by import/copy while keeping its runner and Gemini client isolated here.
+This package has two separate parts: the active synthetic orchestration benchmark (`run.py`) and the draft v2 text-only real-issue response study (`transfer_data.py`). The former is an executable Gemini experiment; the latter is currently a validated data protocol, not a runner. Neither should be confused with the legacy v1 patch-transfer proposal or the unrelated synthetic mechanism-only `--real-issue-plan-only` diagnostic.
 
 ## Fixed experiment
 
@@ -25,21 +25,25 @@ python -m llm_poc_rewrite.run --resume
 
 A normal run refuses to overwrite an existing checkpoint; use `--resume` to continue it or choose a new output directory for a fresh run. A completed checkpoint cannot be resumed.
 
-## Real-issue pilot status
+## Real-issue text-transfer pilot
 
-[REAL_ISSUE_PILOT_PLAN.md](REAL_ISSUE_PILOT_PLAN.md) describes a **pragmatic transfer pilot design, not an implemented real-issue benchmark**. The goal is to evaluate the orchestration approach on real issue text, repository snapshots, patches, and tests—not to replay history 1:1. A fully historical graph rewire is optional for this transfer question; any tracker-declared blockers and curated task-context affinities must remain distinct and labeled by evidence quality. The current Gensim #3525 / Flair #3441 pair is only a two-node historical candidate, not formal issue blocking or evidence of patch synergy. `--real-issue-plan-only` still runs only a zero-API mechanism smoke trace with synthetic placeholder tasks and role vectors; it does not change issue inputs/dependencies, generate/apply patches, or run hidden tests. The displayed 36-call count is proposed arithmetic, not a live schedule. The proposed transfer protocol targets 4–8 real, independently actionable issues with frozen base revisions, verified tests, paired patch attempts, and per-task outcome/cost records; it does **not** require a historical graph rewire. A live run is not implemented: task capture, sandboxed patch/test execution, and patch outcome logging are still future work. A draft, empty intake package and dependency-free validator now exist at [data/real_issue_transfer/v1/](data/real_issue_transfer/v1/study.json): run `python -m llm_poc_rewrite.transfer_data` to check record structure and see readiness blockers; `--export-worker-packets` emits only included worker-visible packets. Evaluator references/results are isolated in a separate ledger. The current Pydantic issue leads remain provisional: none has passed a controlled fail-on-base/pass-on-fix check, so no cohort is selected. The feature-schema gate is needed only for any claimed skill-based routing; without validated slot capabilities, use a fixed code-capable worker for feasibility transfer or defer routing claims.
+The text-only pilot is separate from the synthetic allocation benchmark. It reuses the three existing `AGENT_MODELS` entries and their role-specific system prompts (analyst, extractor, synthesist) from `llm_poc_rewrite/config.py`, but runs each independently on the same authentic issue packet and bounded reference context—not as an orchestration pipeline. It does **not** evaluate agent frameworks, patch generation/application, repository-wide correctness, or test-pass claims. No large repository clone is needed or included. Agents get only the frozen task/context packet and have no browsing or repository tools. The pilot records each role/model response per issue/repetition and scores anonymized responses with a two-rater human rubric; report results per issue and descriptively. Because model and system prompt vary together by role, this estimates configured role/model/prompt bundles, not isolated model superiority.
 
+The draft v2 intake package is at [data/real_issue_transfer/v2/study.json](data/real_issue_transfer/v2/study.json), with two distinct Pydantic issue families (#10694 nested union serialization; #10477 cached-property export) in [tasks.jsonl](data/real_issue_transfer/v2/tasks.jsonl). Each packet includes the bounded task brief, acceptance criteria, short official-doc context snippets, provenance/transformation note, and hashes. Comment-derived workarounds or causal hints stay out of the worker packet and in evaluator-only disclosure notes. Both examples are public historical reports, so the draft marks eligibility pending: treat them as leakage-aware exploratory candidates, not blind discovery evidence. The study protocol copies all three current `AGENT_MODELS` IDs from config and requires an exact match at validation; it uses temperature 0.0 and three repetitions per task/agent (18 responses; 36 rubric ratings). Reviewer identities have not been invented, and the package is intentionally not ready for a live run or packet export.
 
-## Real-issue intake package validation
-
-From the repository root:
+Validate the v2 draft and view blockers (exit status 0 means the package is structurally valid; `ready: false` is expected):
 
 ```bash
 python -m llm_poc_rewrite.transfer_data
+```
+
+After actual independent eligibility adjudication and model preregistration, export only the worker-visible packets:
+
+```bash
 python -m llm_poc_rewrite.transfer_data --export-worker-packets
 ```
 
-The first command exits nonzero only for malformed/inconsistent package records; a structurally valid draft can still report `ready: false` and enumerate study blockers. The export command intentionally returns only included solver-visible fields, never evaluator-only trusted-fix/test data. No candidate issue records have been added yet because web screening is not reproduction evidence.
+The export is fail-closed until readiness gates pass. The v1 patch/test package remains available only for legacy compatibility via `python -m llm_poc_rewrite.transfer_data --version 1`; it is not the selected study design. The text-only pilot evaluates human-rated agent responses; it does not use the existing synthetic-task LLM judge. See [REAL_ISSUE_PILOT_PLAN.md](REAL_ISSUE_PILOT_PLAN.md) for model/role interpretation, limitations, and the separation from the historical mechanism smoke trace.
 
 ## Safe design check and manual execution
 
@@ -55,4 +59,4 @@ A live run requires `GEMINI_API_KEY` and is intentionally not run as part of loc
 python -m llm_poc_rewrite.run
 ```
 
-The old `llm_poc` folder and tests are deliberately left in place until the new implementation has been reviewed and manually validated; replacing them is a separate final step.
+The pre-existing `llm_poc` package remains in the repository as a separate legacy implementation; it is not imported by `llm_poc_rewrite` and is not replaced by this package.

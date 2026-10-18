@@ -1,7 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/llm-poc-rewrite/transfer-data.schema.json",
-  "title": "Real-Issue Transfer Package Records",
+  "title": "Legacy Real-Issue Patch-Transfer Package Records (v1)",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "status": {"enum": ["pending", "completed", "failed", "timeout", "cancelled"]}
+  },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "positiveInt": {"type": "integer", "minimum": 1},
@@ -142,5 +147,6 @@
     {"$ref": "#/$defs/evaluator"},
     {"$ref": "#/$defs/relation"},
     {"$ref": "#/$defs/run"}
-  ]
+  ],
+  "$comment": "Legacy record schema for v1 data ledgers. Study metadata is validated by schemas/transfer_study.schema.json."
 }

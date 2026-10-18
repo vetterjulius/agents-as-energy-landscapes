@@ -19,18 +19,9 @@ class AgentSlot:
     model: str | None = None
 
 
-ANALYST_PROMPT = (
-    "You are a precise analytical reasoning specialist. Break down problems, "
-    "identify key quantities, compare alternatives, state assumptions, and never invent numbers."
-)
-EXTRACTOR_PROMPT = (
-    "You are a meticulous data-extraction specialist. Follow instructions exactly "
-    "and copy requested values verbatim."
-)
-SYNTHESIST_PROMPT = (
-    "You are a synthesis specialist. Combine provided facts into a concise coherent "
-    "response, preserve every fact, and resolve contradictions explicitly."
-)
+ANALYST_PROMPT = config.AGENT_SYSTEM_PROMPTS["analyst"]
+EXTRACTOR_PROMPT = config.AGENT_SYSTEM_PROMPTS["extractor"]
+SYNTHESIST_PROMPT = config.AGENT_SYSTEM_PROMPTS["synthesist"]
 
 
 def build_agent_slots() -> list[AgentSlot]:
@@ -56,7 +47,6 @@ class TaskSpec:
     reference_answer: str
     rubric: tuple[str, ...]
     depends_on: int | None = None
-    unit_cost_hint: float = 1.0
 
 
 @dataclass
