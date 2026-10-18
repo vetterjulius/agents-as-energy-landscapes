@@ -13,8 +13,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dotenv import load_dotenv
 import time
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 from pathlib import Path
 from typing import Any, Dict, List
 import pandas as pd
@@ -206,7 +210,6 @@ def run_experiment(
 
 
 def main():
-    load_dotenv()  # Load environment variables from .env file if present
     parser = argparse.ArgumentParser(description="Run Minimal LLM PoC")
     parser.add_argument("--mock", action="store_true", help="Run with mock LLM outputs")
     parser.add_argument(

@@ -13,7 +13,12 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from . import api, config
-from .scenario import TaskDef, get_interaction_graph, get_synergy_partners
+from .scenario import (
+    JUDGE_SYSTEM_PROMPT,
+    TaskDef,
+    get_interaction_graph,
+    get_synergy_partners,
+)
 
 
 @dataclass
@@ -72,34 +77,36 @@ def evaluate_with_judge(
 
     generation = api.generate(
         prompt=prompt,
-        system_prompt=config.JUDGE_SYSTEM_PROMPT if hasattr(config, "JUDGE_SYSTEM_PROMPT") else (
-            "You are a strict code quality evaluator. "
-            "Reply with ONLY JSON: {\"score\": 0, \"reason\": \"...\"} or {\"score\": 1, \"reason\": \"...\"}."
-        ),
+        system_prompt=JUDGE_SYSTEM_PROMPT,
         model=config.JUDGE_MODEL,
         judge=True,
         mock=mock,
     )
 
     raw = generation.text.strip()
+    cleaned = raw
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
+    elif "```" in cleaned:
+        cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
 
     # Resilient JSON extraction
     try:
-        data = json.loads(raw)
+        data = json.loads(cleaned)
         score = float(data.get("score", 0))
         reason = str(data.get("reason", "Parsed JSON"))
         return (1.0 if score >= 0.5 else 0.0), reason
     except Exception:
         pass
 
-    # Regex search for {"score": 1} or {"score": 0}
+    # Regex search for {"score": 1} or {"score": 0} anywhere in output
     match = re.search(r'["\']score["\']\s*:\s*([01])', raw)
     if match:
         score = float(match.group(1))
         return score, f"Regex extracted score {score} from: {raw[:60]}"
 
     # Fallback keyword match
-    if '"score": 1' in raw or "'score': 1" in raw:
+    if '"score": 1' in raw or "'score': 1" in raw or 'score: 1' in raw:
         return 1.0, "Substring matched pass"
 
     return 0.0, f"Judge output unparseable: {raw[:100]}"

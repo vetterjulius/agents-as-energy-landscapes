@@ -27,9 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-# ---------------------------------------------------------------------------
 # Agent definitions
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class AgentDef:
@@ -104,9 +102,7 @@ AGENTS: List[AgentDef] = [
 AGENT_INDEX = {a.id: i for i, a in enumerate(AGENTS)}
 NUM_AGENTS = len(AGENTS)
 
-# ---------------------------------------------------------------------------
 # Judge configuration (disjoint from agent models)
-# ---------------------------------------------------------------------------
 
 JUDGE_MODEL = "gemini-3.8-flash"
 JUDGE_SYSTEM_PROMPT = (
@@ -118,9 +114,7 @@ JUDGE_SYSTEM_PROMPT = (
     "Score 0 means it has significant omissions, syntax errors, or failing logic."
 )
 
-# ---------------------------------------------------------------------------
 # Task definition schema
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class TaskDef:
@@ -137,9 +131,7 @@ class TaskDef:
     task_affinity: Tuple[float, float, float, float] = (0.25, 0.25, 0.25, 0.25)
 
 
-# ---------------------------------------------------------------------------
 # Slot Affinities (Common baseline per subsystem slot)
-# ---------------------------------------------------------------------------
 SLOT_AFFINITIES: Dict[int, Tuple[float, float, float, float]] = {
     0: (0.3, 0.2, 0.9, 0.3),  # auth -> security
     1: (0.9, 0.1, 0.3, 0.2),  # user_db -> backend
@@ -151,10 +143,8 @@ SLOT_AFFINITIES: Dict[int, Tuple[float, float, float, float]] = {
     7: (0.3, 0.8, 0.2, 0.3),  # observability -> infra
 }
 
-# ---------------------------------------------------------------------------
 # Phase 1: "Monolith Split" (Episodes 0-1)
 # Synergies: (0, 1) [auth<->user_db], (2, 3) [cart<->inventory], (4, 5) [payment<->order]
-# ---------------------------------------------------------------------------
 PHASE1_TASKS: List[TaskDef] = [
     TaskDef(
         id="p1_s0_auth_schema",
@@ -332,10 +322,8 @@ PHASE1_TASKS: List[TaskDef] = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
 # Phase 2: "Gateway & Microservice Integration" (Episodes 2-3)
 # Synergies: (0, 6) [auth<->routing], (2, 4) [cart<->payment], (3, 5) [inventory<->order]
-# ---------------------------------------------------------------------------
 PHASE2_TASKS: List[TaskDef] = [
     TaskDef(
         id="p2_s0_auth_jwt_middleware",
@@ -517,10 +505,8 @@ PHASE2_TASKS: List[TaskDef] = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
 # Phase 3: "Event-Driven Reactive Platform" (Episodes 4-5)
 # Synergies: (0, 2) [auth<->cart], (3, 6) [inventory<->routing], (5, 6) [order<->routing], (4, 7) [payment<->observability]
-# ---------------------------------------------------------------------------
 PHASE3_TASKS: List[TaskDef] = [
     TaskDef(
         id="p3_s0_auth_session_store",
@@ -704,9 +690,7 @@ PHASE3_TASKS: List[TaskDef] = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
 # Phase Aggregation and Horizon
-# ---------------------------------------------------------------------------
 ALL_PHASES: List[List[TaskDef]] = [PHASE1_TASKS, PHASE2_TASKS, PHASE3_TASKS]
 
 NUM_EPISODES = 6
@@ -725,9 +709,7 @@ def get_tasks_for_episode(episode: int) -> List[TaskDef]:
     return ALL_PHASES[get_phase(episode)]
 
 
-# ---------------------------------------------------------------------------
 # Explicit Topological Interaction Graphs (Synergies per Phase)
-# ---------------------------------------------------------------------------
 # Phase 1: (0, 1), (2, 3), (4, 5)
 # Phase 2: (0, 6), (2, 4), (3, 5)
 # Phase 3: (0, 2), (3, 6), (5, 6), (4, 7)

@@ -1,13 +1,11 @@
 """Fixed configuration for the Minimal LLM PoC.
 
 Model IDs and API endpoint are carried over from the existing LLM PoC
-implementations.  Retry logic parameters are also preserved.
+implementations. Retry logic parameters are also preserved.
 """
 from __future__ import annotations
 
-# ---------------------------------------------------------------------------
 # API endpoint and models (from llm_poc_rewrite/config.py)
-# ---------------------------------------------------------------------------
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
@@ -47,18 +45,14 @@ assert _all_used == AVAILABLE_MODELS, (
     f"Not all models used. Missing: {AVAILABLE_MODELS - _all_used}"
 )
 
-# ---------------------------------------------------------------------------
 # LLM generation parameters
-# ---------------------------------------------------------------------------
 WORKER_TEMPERATURE = 0.0
 WORKER_TOP_P = 1.0
 WORKER_MAX_TOKENS = 1024
 JUDGE_TEMPERATURE = 0.0
-JUDGE_MAX_TOKENS = 64
+JUDGE_MAX_TOKENS = 256
 
-# ---------------------------------------------------------------------------
-# Orchestrator / Energy landscape parameters (from controlled_benchmark)
-# ---------------------------------------------------------------------------
+# Orchestrator and energy landscape parameters (from controlled_benchmark)
 LAMBDA_ALIGN = 0.5
 LAMBDA_MEMORY = 0.5
 INTERACTION_WEIGHT = 1.0
@@ -71,9 +65,7 @@ SA_MIN_TEMPERATURE = 0.01
 SA_COOLING_RATE = 0.95
 MAX_ENERGY_EVALUATIONS = 150
 
-# ---------------------------------------------------------------------------
 # Scenario dimensions
-# ---------------------------------------------------------------------------
 NUM_AGENTS = 4
 NUM_TASKS_PER_EPISODE = 8
 DIM = 4  # Capability embedding dimension
@@ -84,7 +76,5 @@ EPISODES_PER_PHASE = NUM_EPISODES // NUM_PHASES  # 2 episodes per phase
 # Orchestrators to compare
 CONDITIONS = ("baseline", "static_energy_sa", "dynamic_energy_sa")
 
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
+# Output directory
 OUTPUT_DIR = "results/minimal_llm_poc"
