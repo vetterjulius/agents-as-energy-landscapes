@@ -21,24 +21,28 @@ def test_stage_order_and_shared_paths(tmp_path: Path) -> None:
         "paper statistical analysis",
         "adaptation diagnostics",
         "setup tables",
-        "all benchmark figures",
-        "internal-state manuscript figure",
-        "manuscript-facing figures",
+        "experimental design figure",
+        "numerical paper figures",
         "primary table verification",
-        "fresh-versus-frozen verification",
     ]
     for _, command in stages[1:]:
         assert str(results) in command
         assert str(artifacts) in command
 
 
-def test_stage_uses_explicit_frozen_reference(tmp_path: Path) -> None:
+def test_historical_comparison_is_optional(tmp_path: Path) -> None:
     frozen = tmp_path / "frozen"
     stages = reproduction.stage_commands(
         tmp_path / "results", tmp_path / "artifacts", tmp_path / "figures", frozen)
-    comparison = dict(stages)["fresh-versus-frozen verification"]
+    comparison = dict(stages)["optional historical comparison"]
     assert "--reference-artifacts-dir" in comparison
     assert str(frozen) in comparison
+
+
+def test_standard_stage_list_has_no_historical_dependency(tmp_path: Path) -> None:
+    names = [name for name, _ in reproduction.stage_commands(
+        tmp_path / "results", tmp_path / "artifacts", tmp_path / "figures")]
+    assert "optional historical comparison" not in names
 
 
 def test_same_selected_and_frozen_artifacts_are_rejected(tmp_path: Path) -> None:
@@ -91,6 +95,12 @@ def test_primary_statistics_validation_requires_24_pairs_of_20(tmp_path: Path) -
 
 
 def test_missing_manuscript_artifact_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="Required fresh reproduction artifacts"):
+        reproduction.validate_manuscript_artifacts(
+            tmp_path / "results", tmp_path / "artifacts", tmp_path / "figures")
+
+
+def test_all_figure_artifacts_are_required(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="Required fresh reproduction artifacts"):
         reproduction.validate_manuscript_artifacts(
             tmp_path / "results", tmp_path / "artifacts", tmp_path / "figures")
