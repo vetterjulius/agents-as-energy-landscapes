@@ -310,10 +310,13 @@ def run_pipeline(results_dir: Path, artifacts_dir: Path,
     print("\nGenerated artifact inventory:")
     for path in generated:
         print(f"  {path}")
+        
+    """
     print("\nManual checks remaining:")
     print("  - Compare all manuscript prose and LaTeX tables with the selected CSV outputs.")
     print("  - Compile paper/paper.tex and inspect all figure placement and captions.")
     print("  - The LLM PoC live-run table is not reproduced by this deterministic pipeline.")
+    """
 
 
 def main(argv: list[str] | None = None) -> int:
