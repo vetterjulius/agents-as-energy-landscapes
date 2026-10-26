@@ -1,0 +1,61 @@
+seed,variant,ground_truth_only_change_theta_identical,assignment_change_gt_constant_theta_response_ok
+42,Static,True,True
+42,Dynamic,True,True
+42,Persistent Dynamic,True,True
+43,Static,True,True
+43,Dynamic,True,True
+43,Persistent Dynamic,True,True
+44,Static,True,True
+44,Dynamic,True,True
+44,Persistent Dynamic,True,True
+45,Static,True,True
+45,Dynamic,True,True
+45,Persistent Dynamic,True,True
+46,Static,True,True
+46,Dynamic,True,True
+46,Persistent Dynamic,True,True
+47,Static,True,True
+47,Dynamic,True,True
+47,Persistent Dynamic,True,True
+48,Static,True,True
+48,Dynamic,True,True
+48,Persistent Dynamic,True,True
+49,Static,True,True
+49,Dynamic,True,True
+49,Persistent Dynamic,True,True
+50,Static,True,True
+50,Dynamic,True,True
+50,Persistent Dynamic,True,True
+51,Static,True,True
+51,Dynamic,True,True
+51,Persistent Dynamic,True,True
+52,Static,True,True
+52,Dynamic,True,True
+52,Persistent Dynamic,True,True
+53,Static,True,True
+53,Dynamic,True,True
+53,Persistent Dynamic,True,True
+54,Static,True,True
+54,Dynamic,True,True
+54,Persistent Dynamic,True,True
+55,Static,True,True
+55,Dynamic,True,True
+55,Persistent Dynamic,True,True
+56,Static,True,True
+56,Dynamic,True,True
+56,Persistent Dynamic,True,True
+57,Static,True,True
+57,Dynamic,True,True
+57,Persistent Dynamic,True,True
+58,Static,True,True
+58,Dynamic,True,True
+58,Persistent Dynamic,True,True
+59,Static,True,True
+59,Dynamic,True,True
+59,Persistent Dynamic,True,True
+60,Static,True,True
+60,Dynamic,True,True
+60,Persistent Dynamic,True,True
+61,Static,True,True
+61,Dynamic,True,True
+61,Persistent Dynamic,True,True
