@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-Controlled Landscape x Solver Benchmark
-=======================================
-Primary scientifically controlled benchmark runner to test:
-> Does an adaptive energy landscape improve multi-agent orchestration under non-stationarity,
-> and is the effect independent of the optimization solver?
-
-Usage:
-    python controlled_landscape_solver_benchmark.py --mode quick
-    python controlled_landscape_solver_benchmark.py --mode research
-    python controlled_landscape_solver_benchmark.py --mode research --seeds 42,43,44,45
-"""
 
 import argparse
 import sys
@@ -21,7 +9,7 @@ from controlled_benchmark.runner import ControlledBenchmarkRunner
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run the Controlled Landscape x Solver Experimental Benchmark."
+        description="Run the Controlled Benchmark."
     )
     parser.add_argument(
         "--mode",
@@ -56,7 +44,7 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="results/controlled_landscape_solver",
+        default="results/controlled_benchmark",
         help="Directory where results (CSV, JSON, README) will be written.",
     )
     parser.add_argument(

@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from paper_artifacts.analysis import make_paper_figures as figures
+from analysis import make_paper_figures as figures
 
 
 def valid_runs() -> pd.DataFrame:

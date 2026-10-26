@@ -19,7 +19,7 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parent
-ANALYSIS = ROOT / "paper_artifacts" / "analysis"
+ANALYSIS = ROOT / "analysis"
 FIGURE_NAMES = [
     "experimental_design_information_boundary",
     "main_ppee10",
@@ -62,7 +62,7 @@ def stage_commands(
         (
             "controlled benchmark",
             build_command(
-                ROOT / "controlled_landscape_solver_benchmark.py",
+                ROOT / "run_controlled_benchmark.py",
                 "--mode", "research",
                 "--output-dir", str(results_dir),
             ),
@@ -299,7 +299,7 @@ def run_pipeline(results_dir: Path, artifacts_dir: Path,
         print(f"[reproduce] {name}", flush=True)
         if name == "optional historical comparison":
             result = subprocess.run(command, cwd=ROOT)
-            if result.returncode:
+            if result.returncode != 0:
                 print("[reproduce] optional historical comparison failed; continuing")
             continue
         subprocess.run(command, cwd=ROOT, check=True)
@@ -310,13 +310,6 @@ def run_pipeline(results_dir: Path, artifacts_dir: Path,
     print("\nGenerated artifact inventory:")
     for path in generated:
         print(f"  {path}")
-        
-    """
-    print("\nManual checks remaining:")
-    print("  - Compare all manuscript prose and LaTeX tables with the selected CSV outputs.")
-    print("  - Compile paper/paper.tex and inspect all figure placement and captions.")
-    print("  - The LLM PoC live-run table is not reproduced by this deterministic pipeline.")
-    """
 
 
 def main(argv: list[str] | None = None) -> int:

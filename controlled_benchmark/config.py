@@ -98,7 +98,7 @@ class BenchmarkConfig:
     risk_weight: float = 1.0
 
     # Output directory
-    output_dir: str = "results/controlled_landscape_solver"
+    output_dir: str = "results/controlled_benchmark"
 
     # Optional comprehensive per-episode mechanism logging (does not affect execution)
     verbose_diagnostics: bool = False
