@@ -1,4 +1,4 @@
-# Minimal LLM PoC – Dependency Change Transfer
+# Minimal LLM PoC - Dependency Change Transfer
 
 This package implements the minimal empirical transfer of the **Dependency Change** scenario from the `controlled_benchmark` to real LLM agents.
 
@@ -6,9 +6,9 @@ This package implements the minimal empirical transfer of the **Dependency Chang
 
 1. **Lightweight and Minimal**: No multi-seed sweeps or statistical battery required; primary empirical evidence remains `controlled_benchmark`.
 2. **Transfer of Dependency Change**: Models an evolving e-commerce platform across 8 subsystem slots and 3 architectural phases:
-   - **Phase 1 (Monolith Split, Episodes 0–1)**: Synergies `(0, 1)`, `(2, 3)`, `(4, 5)`.
-   - **Phase 2 (Gateway & Direct Checkout, Episodes 2–3)**: Synergies `(0, 6)`, `(2, 4)`, `(3, 5)`.
-   - **Phase 3 (Event-Driven Reactive Platform, Episodes 4–5)**: Synergies `(0, 2)`, `(3, 6)`, `(5, 6)`, `(4, 7)`.
+   - **Phase 1 (Monolith Split, Episodes 0-1)**: Synergies `(0, 1)`, `(2, 3)`, `(4, 5)`.
+   - **Phase 2 (Gateway & Direct Checkout, Episodes 2-3)**: Synergies `(0, 6)`, `(2, 4)`, `(3, 5)`.
+   - **Phase 3 (Event-Driven Reactive Platform, Episodes 4-5)**: Synergies `(0, 2)`, `(3, 6)`, `(5, 6)`, `(4, 7)`.
 3. **No Heavy Frameworks or Sandboxes**: Solves self-contained coding and configuration prompts, evaluating traces deterministically (75%) and via LLM-as-judge (25%).
 4. **Disjoint Judge Model & Catalog Coverage**:
    - `gemini-3.5-flash-lite`: `backend`, `frontend`

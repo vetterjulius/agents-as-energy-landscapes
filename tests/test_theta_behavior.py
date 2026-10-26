@@ -27,7 +27,7 @@ from landscape import LandscapeState, ProblemContext
 # ---------------------------------------------------------------------------
 
 def _make_problem(N: int, M: int, d: int = 2) -> ProblemContext:
-    """Minimal, neutral ProblemContext – all problem tensors are zeros."""
+    """Minimal, neutral ProblemContext - all problem tensors are zeros."""
     return ProblemContext(
         s=torch.zeros(N, d),
         c=torch.zeros(M, d),
@@ -78,7 +78,7 @@ def _run_ema(
 
 
 # ---------------------------------------------------------------------------
-# Test group 1 – Stationary: convergence toward C, no unbounded drift
+# Test group 1 - Stationary: convergence toward C, no unbounded drift
 # ---------------------------------------------------------------------------
 
 class TestStationaryConvergence:
@@ -167,13 +167,13 @@ class TestStationaryConvergence:
 
 
 # ---------------------------------------------------------------------------
-# Test group 2 – Dependency change: Θ tracks the new observed structure
+# Test group 2 - Dependency change: Θ tracks the new observed structure
 # ---------------------------------------------------------------------------
 
 class TestDependencyChange:
     """
     After observing a new co-assignment structure, Θ must move toward it
-    and away from the old one – smoothly, not instantaneously.
+    and away from the old one - smoothly, not instantaneously.
     """
     M = 4
     N = 2
@@ -290,7 +290,7 @@ class TestDependencyChange:
 
 
 # ---------------------------------------------------------------------------
-# Test group 3 – Context-independence: Θ cares only about X, not context
+# Test group 3 - Context-independence: Θ cares only about X, not context
 # ---------------------------------------------------------------------------
 
 class TestContextIndependence:
@@ -429,7 +429,7 @@ class TestContextIndependence:
 
 
 # ---------------------------------------------------------------------------
-# Test group 4 – Ground-truth isolation: GT never enters the Θ path
+# Test group 4 - Ground-truth isolation: GT never enters the Θ path
 # ---------------------------------------------------------------------------
 
 class TestGroundTruthIsolation:

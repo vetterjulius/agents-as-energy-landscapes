@@ -357,14 +357,14 @@ Die zeitliche Update-Semantik ist strikt eingehalten:
 
 Tabelle 1: Aggregierte Kennzahlen über die Phasen (Mittelwert $\\pm$ Standardabweichung über 20 Seeds).
 
-| Quantity | Phase I (ep 0–29) | Change window (ep 27–35) | Phase II (ep 30–59) | Phase III (ep 60–89) |
+| Quantity | Phase I (ep 0-29) | Change window (ep 27-35) | Phase II (ep 30-59) | Phase III (ep 60-89) |
 | :--- | ---: | ---: | ---: | ---: |
 | consistency | {c_p1_m:.4f} $\\pm$ {c_p1_s:.4f} | {c_cw_m:.4f} $\\pm$ {c_cw_s:.4f} | {c_p2_m:.4f} $\\pm$ {c_p2_s:.4f} | {c_p3_m:.4f} $\\pm$ {c_p3_s:.4f} |
 | eta | {e_p1_m:.4f} $\\pm$ {e_p1_s:.4f} | {e_cw_m:.4f} $\\pm$ {e_cw_s:.4f} | {e_p2_m:.4f} $\\pm$ {e_p2_s:.4f} | {e_p3_m:.4f} $\\pm$ {e_p3_s:.4f} |
 | observation change | {o_p1_m:.4f} $\\pm$ {o_p1_s:.4f} | {o_cw_m:.4f} $\\pm$ {o_cw_s:.4f} | {o_p2_m:.4f} $\\pm$ {o_p2_s:.4f} | {o_p3_m:.4f} $\\pm$ {o_p3_s:.4f} |
 | theta step | {t_p1_m:.4f} $\\pm$ {t_p1_s:.4f} | {t_cw_m:.4f} $\\pm$ {t_cw_s:.4f} | {t_p2_m:.4f} $\\pm$ {t_p2_s:.4f} | {t_p3_m:.4f} $\\pm$ {t_p3_s:.4f} |
 
-Tabelle 2: Trajektorie direkt um den Strukturwechsel (Episoden 27–35, Mittelwerte über Seeds).
+Tabelle 2: Trajektorie direkt um den Strukturwechsel (Episoden 27-35, Mittelwerte über Seeds).
 
 | Episode | observation change ($||C_t - C_{{t-1}}||_F$) | consistency ($c_t$) | eta ($\\eta_t$) | theta step ($||\\Delta \\Theta_t||_F$) | B progress ($\\Delta d_{{B, t}}$) |
 | ---: | ---: | ---: | ---: | ---: | ---: |

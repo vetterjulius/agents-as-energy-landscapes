@@ -77,7 +77,7 @@ def test_positive_signal_directional_movement():
     problem, state = make_problem_and_state(M=3, theta_val=0.0)
     manager = EpisodeAdaptationManager(adaptation_mode="theta-only", eta_theta=0.5)
 
-    # X0: agents each assigned one task – tasks 0 and 1 NOT co-assigned
+    # X0: agents each assigned one task - tasks 0 and 1 NOT co-assigned
     X0 = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
     state1 = manager.step(state, X0, problem)
 
