@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import datetime
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta-state-gated-mechanism-20260917"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta-state-gated-mechanism"
 
 
 M = 6
