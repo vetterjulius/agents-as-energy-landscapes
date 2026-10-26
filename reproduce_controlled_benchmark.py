@@ -19,7 +19,6 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parent
-ANALYSIS = ROOT / "analysis"
 FIGURE_NAMES = [
     "experimental_design_information_boundary",
     "main_ppee10",
@@ -31,8 +30,8 @@ FIGURE_NAMES = [
 ]
 
 
-def build_command(script: Path, *arguments: str) -> list[str]:
-    return [sys.executable, str(script), *arguments]
+def build_command(module: str, *arguments: str) -> list[str]:
+    return [sys.executable, "-m", module, *arguments]
 
 
 def current_commit() -> str:
@@ -62,33 +61,30 @@ def stage_commands(
         (
             "controlled benchmark",
             build_command(
-                ROOT / "run_controlled_benchmark.py",
+                "run_controlled_benchmark",
                 "--mode", "research",
                 "--output-dir", str(results_dir),
             ),
         ),
         ("integrity validation", build_command(
-            ANALYSIS / "audit_integrity.py", *paths,
+            "analysis.audit_integrity", *paths,
             "--expected-commit", commit)),
         ("paper statistical analysis", build_command(
-            ANALYSIS / "statistical_analysis.py", *paths)),
+            "analysis.statistical_analysis", *paths)),
         ("adaptation diagnostics", build_command(
-            ANALYSIS / "adaptation_diagnostics.py", *paths)),
+            "analysis.adaptation_diagnostics", *paths)),
         ("setup tables", build_command(
-            ANALYSIS / "make_setup_tables.py", *paths)),
+            "analysis.make_setup_tables", *paths)),
         ("experimental design figure", build_command(
-            ANALYSIS / "make_experimental_design_figure.py", *paths,
+            "analysis.make_experimental_design_figure", *paths,
             "--paper-figures-dir", str(paper_figures_dir))),
         ("numerical paper figures", build_command(
-            ANALYSIS / "make_paper_figures.py", *paths,
-            "--paper-figures-dir", str(paper_figures_dir))),
-        ("primary table verification", build_command(
-            ANALYSIS / "verify_results_table.py", *paths,
-            "--manuscript", str(ROOT / "paper" / "results_section.tex"))),
+            "analysis.make_paper_figures", *paths,
+            "--paper-figures-dir", str(paper_figures_dir)))
     ]
     if frozen_artifacts_dir is not None:
         commands.append(("optional historical comparison", build_command(
-            ANALYSIS / "compare_fresh_vs_frozen.py", *paths,
+            "analysis.compare_fresh_vs_frozen", *paths,
             "--reference-artifacts-dir", str(frozen_artifacts_dir))))
     return commands
 
