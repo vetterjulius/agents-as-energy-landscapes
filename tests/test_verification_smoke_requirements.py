@@ -1,8 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
-import shutil
-import tempfile
 import pytest
 import numpy as np
 import pandas as pd
@@ -13,46 +11,42 @@ from controlled_benchmark.runner import ControlledBenchmarkRunner
 from controlled_benchmark.scenarios import generate_scenario_trajectory
 
 
-def test_reproducibility_same_seed_twice():
+def test_reproducibility_same_seed_twice(tmp_path):
     """Reproducibility: Running the same seed twice yields 100% identical results."""
-    tmpdir1 = tempfile.mkdtemp()
-    tmpdir2 = tempfile.mkdtemp()
-    try:
-        cfg1 = BenchmarkConfig.quick_mode(
-            seeds=[42],
-            scenarios=["Capability Drift"],
-            num_episodes=5,
-            perturb_episode=2,
-            max_energy_evaluations=30,
-            output_dir=tmpdir1,
-        )
-        cfg2 = BenchmarkConfig.quick_mode(
-            seeds=[42],
-            scenarios=["Capability Drift"],
-            num_episodes=5,
-            perturb_episode=2,
-            max_energy_evaluations=30,
-            output_dir=tmpdir2,
-        )
+    tmpdir1 = str(tmp_path / "run1")
+    tmpdir2 = str(tmp_path / "run2")
+    cfg1 = BenchmarkConfig.quick_mode(
+        seeds=[42],
+        scenarios=["Capability Drift"],
+        num_episodes=5,
+        perturb_episode=2,
+        max_energy_evaluations=30,
+        output_dir=tmpdir1,
+    )
+    cfg2 = BenchmarkConfig.quick_mode(
+        seeds=[42],
+        scenarios=["Capability Drift"],
+        num_episodes=5,
+        perturb_episode=2,
+        max_energy_evaluations=30,
+        output_dir=tmpdir2,
+    )
 
-        res1 = ControlledBenchmarkRunner(cfg1).run_benchmark()
-        res2 = ControlledBenchmarkRunner(cfg2).run_benchmark()
+    res1 = ControlledBenchmarkRunner(cfg1).run_benchmark()
+    res2 = ControlledBenchmarkRunner(cfg2).run_benchmark()
 
-        df_runs1 = res1["runs_df"]
-        df_runs2 = res2["runs_df"]
-        df_ep1 = res1["episodes_df"]
-        df_ep2 = res2["episodes_df"]
+    df_runs1 = res1["runs_df"]
+    df_runs2 = res2["runs_df"]
+    df_ep1 = res1["episodes_df"]
+    df_ep2 = res2["episodes_df"]
 
-        df_runs1_clean = df_runs1.drop(columns=["total_runtime_sec"])
-        df_runs2_clean = df_runs2.drop(columns=["total_runtime_sec"])
-        pd.testing.assert_frame_equal(df_runs1_clean, df_runs2_clean)
+    df_runs1_clean = df_runs1.drop(columns=["total_runtime_sec"])
+    df_runs2_clean = df_runs2.drop(columns=["total_runtime_sec"])
+    pd.testing.assert_frame_equal(df_runs1_clean, df_runs2_clean)
 
-        df_ep1_clean = df_ep1.drop(columns=["runtime_sec"])
-        df_ep2_clean = df_ep2.drop(columns=["runtime_sec"])
-        pd.testing.assert_frame_equal(df_ep1_clean, df_ep2_clean)
-    finally:
-        shutil.rmtree(tmpdir1, ignore_errors=True)
-        shutil.rmtree(tmpdir2, ignore_errors=True)
+    df_ep1_clean = df_ep1.drop(columns=["runtime_sec"])
+    df_ep2_clean = df_ep2.drop(columns=["runtime_sec"])
+    pd.testing.assert_frame_equal(df_ep1_clean, df_ep2_clean)
 
 
 def test_adaptation_timing_episode_t_effects_in_t_plus_1():

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 
@@ -165,7 +165,7 @@ def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_
 
     tensor_path = tmp_path / "mechanism_diagnostics.npz"
     manifest_path = tmp_path / "mechanism_diagnostics.json"
-    assert tensor_path.exists()
+    assert tensor_path.exists(), "Legacy NPZ artifact must exist for small test configs"
     assert manifest_path.exists()
 
     with np.load(tensor_path) as artifact:
@@ -198,7 +198,7 @@ def test_mechanism_diagnostic_artifact_has_manifest_and_run_episode_mapping(tmp_
     assert manifest["verbose_diagnostics"] is True
     assert "kappa_after" in manifest["verbose_tensor_fields"]
     assert "AssignmentEnergy" in manifest["energy_breakdown_fields"]
-    assert len(manifest["episode_metadata"]) == 15
+    assert len(manifest["episode_metadata"]) == 15  # 5 runs x 3 episodes
     assert all("run_index" in item and "episode" in item for item in manifest["episode_metadata"])
     assert manifest["solver_trace_event_count"] > 0
     assert len(manifest["solver_trace_events"]) == manifest["solver_trace_event_count"]

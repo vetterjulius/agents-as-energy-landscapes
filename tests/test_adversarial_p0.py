@@ -297,9 +297,11 @@ class TestRecoveryMetric:
         good_energies = [1.0, 1.0, 1.0, 1.0, 1.0, 3.0, 0.9, 0.9, 0.9, 0.9]
         bad_energies  = [1.0, 1.0, 1.0, 1.0, 1.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         good_summary = compute_trajectory_summary(make_synthetic_records(good_energies),
-                                                  "Capability Drift", perturb, pre_window=3, post_window=3)
+                                                  "Capability Drift", perturb, pre_window=3, post_window=3,
+                                                  reference_energy=1.0, reference_method="exact_optimal")
         bad_summary  = compute_trajectory_summary(make_synthetic_records(bad_energies),
-                                                  "Capability Drift", perturb, pre_window=3, post_window=3)
+                                                  "Capability Drift", perturb, pre_window=3, post_window=3,
+                                                  reference_energy=1.0, reference_method="exact_optimal")
         assert good_summary.recovery_time < bad_summary.recovery_time, \
             f"P0-3 FAIL: Bad solver recovered faster ({bad_summary.recovery_time}) than good ({good_summary.recovery_time})!"
         assert bad_summary.recovery_time == float(len(bad_energies) - perturb), \
@@ -310,7 +312,8 @@ class TestRecoveryMetric:
         threshold = compute_recovery_threshold(1.0)
         energies = [1.0, 1.0, 1.0, 1.0, 1.0, 3.0, threshold - 0.01, 3.0, 3.0, 3.0]
         summary = compute_trajectory_summary(make_synthetic_records(energies),
-                                             "Capability Drift", perturb, pre_window=3, post_window=3)
+                                             "Capability Drift", perturb, pre_window=3, post_window=3,
+                                             reference_energy=1.0, reference_method="exact_optimal")
         assert summary.recovery_time == float(len(energies) - perturb), \
             f"P0-3 FAIL: 1 hit produced recovery={summary.recovery_time} (should be censored)."
 
@@ -319,7 +322,8 @@ class TestRecoveryMetric:
         threshold = compute_recovery_threshold(1.0)
         energies = [1.0, 1.0, 1.0, 1.0, 1.0, 3.0, threshold - 0.01, threshold - 0.01, 3.0, 3.0]
         summary = compute_trajectory_summary(make_synthetic_records(energies),
-                                             "Capability Drift", perturb, pre_window=3, post_window=3)
+                                             "Capability Drift", perturb, pre_window=3, post_window=3,
+                                             reference_energy=1.0, reference_method="exact_optimal")
         assert summary.recovery_time == float(len(energies) - perturb), \
             f"P0-3 FAIL: 2 hits produced recovery={summary.recovery_time} (should be censored)."
 
@@ -328,7 +332,8 @@ class TestRecoveryMetric:
         threshold = compute_recovery_threshold(1.0)
         energies = [1.0, 1.0, 1.0, 1.0, 1.0, 3.0, threshold - 0.01, threshold - 0.01, threshold - 0.01, 3.0]
         summary = compute_trajectory_summary(make_synthetic_records(energies),
-                                             "Capability Drift", perturb, pre_window=3, post_window=3)
+                                             "Capability Drift", perturb, pre_window=3, post_window=3,
+                                             reference_energy=1.0, reference_method="exact_optimal")
         assert summary.recovery_time == 1.0, \
             f"P0-3 FAIL: 3 consecutive hits returned recovery_time={summary.recovery_time} (expected 1.0)."
 
@@ -336,7 +341,8 @@ class TestRecoveryMetric:
         perturb = 5
         energies = [1.0, 1.0, 1.0, 1.0, 1.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         summary = compute_trajectory_summary(make_synthetic_records(energies),
-                                             "Capability Drift", perturb, pre_window=3, post_window=3)
+                                             "Capability Drift", perturb, pre_window=3, post_window=3,
+                                             reference_energy=1.0, reference_method="exact_optimal")
         assert summary.recovery_time == float(len(energies) - perturb)
 
     def test_recovery_threshold_same_for_all_solvers(self):

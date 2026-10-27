@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 from pathlib import Path
@@ -23,7 +23,6 @@ def test_stage_order_and_shared_paths(tmp_path: Path) -> None:
         "setup tables",
         "experimental design figure",
         "numerical paper figures",
-        "primary table verification",
     ]
     for _, command in stages[1:]:
         assert str(results) in command

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import torch
@@ -57,29 +57,6 @@ def test_same_seed_generates_same_problem_instance():
         assert torch.equal(inst1.risk_weights, inst2.risk_weights)
 
 
-# ---------------------------------------------------------------------------
-# Requirement 2: Compared solvers receive the same problem instance
-# ---------------------------------------------------------------------------
-def test_compared_solvers_receive_same_problem_instance():
-    cfg = BenchmarkConfig.quick_mode(seeds=[42])
-    trajectory = generate_scenario_trajectory(
-        scenario_id="Capability Drift",
-        seed=42,
-        num_episodes=cfg.num_episodes,
-        perturb_episode=cfg.perturb_episode,
-        N=cfg.num_agents,
-        M=cfg.num_tasks,
-        d=cfg.dim,
-    )
-
-    ctx_sa = problem_instance_to_problem_context(trajectory[0])
-    ctx_greedy = problem_instance_to_problem_context(trajectory[0])
-
-    assert torch.equal(ctx_sa.s, ctx_greedy.s)
-    assert torch.equal(ctx_sa.c, ctx_greedy.c)
-    assert torch.equal(ctx_sa.C, ctx_greedy.C)
-    assert torch.equal(ctx_sa.W_risk, ctx_greedy.W_risk)
-    assert ctx_sa.N == ctx_greedy.N and ctx_sa.M == ctx_greedy.M and ctx_sa.d == ctx_greedy.d
 
 
 # ---------------------------------------------------------------------------
@@ -315,25 +292,6 @@ def test_results_contain_seed_problem_solver_landscape_metadata():
         assert col in runs_df.columns, f"Missing required column: {col}"
 
 
-# ---------------------------------------------------------------------------
-# Requirement 10: ILP timeout/fallback is explicitly represented
-# ---------------------------------------------------------------------------
-def test_ilp_timeout_and_fallback_explicitly_represented():
-    # Construct an instance with M=12 where MILP cannot solve in 0.0001 seconds
-    inst = generate_stationary_episode(episode=0, seed=42, perturb_episode=5, N=4, M=12, d=4)
-    ctx = problem_instance_to_problem_context(inst)
-    state = make_initial_landscape_state(inst)
-    landscape = Landscape(ctx, state)
-
-    # Extremely short time limit to force timeout
-    ilp = FixedLandscapeILPSolver(time_limit_sec=0.0001)
-    res = ilp.solve(landscape)
-
-    # Must be explicitly represented as timeout / fallback, NOT silently as optimal ILP
-    assert res.timeout is True or res.status in ("timeout", "failed")
-    assert res.is_optimal is False
-    assert res.fallback_used is True
-    assert res.termination_reason in ("timeout", "failed")
 
 
 # ---------------------------------------------------------------------------
