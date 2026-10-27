@@ -7,7 +7,6 @@ from typing import Any
 
 import torch
 
-from energy.risk import RiskPredictor
 from landscape import Landscape, ProblemContext
 
 
