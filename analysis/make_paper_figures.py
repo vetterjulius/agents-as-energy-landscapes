@@ -15,7 +15,7 @@ from scipy import stats
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analysis.common as common
 from analysis.common import COMPARISONS, CONDITION_ORDER, PERTURB_EPISODE, SCENARIOS
-from analysis.make_figures import COLORS, COMP_COLORS, LABEL_SHORT, MARKERS
+from analysis.figures_common import COLORS, COMP_COLORS, LABEL_SHORT, MARKERS
 
 
 PAPER_FIGURES = common.ROOT / "paper" / "figures"

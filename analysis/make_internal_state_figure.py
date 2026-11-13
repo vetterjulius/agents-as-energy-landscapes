@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import analysis.common as common
-from analysis.make_figures import COLORS, LABEL_SHORT
+from analysis.figures_common import COLORS, LABEL_SHORT
 
 
 SCENARIOS = ("Stationary", "Dependency Change")
