@@ -13,8 +13,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analysis.common as common
-from analysis.common import CONDITION_LABEL, CONDITION_ORDER, PERTURB_EPISODE, SCENARIOS, \
-    load_episodes, load_runs
+from analysis.common import CONDITION_LABEL, CONDITION_ORDER, PERTURB_EPISODE, SCENARIOS, load_episodes, load_runs
 
 FIG = common.ARTIFACTS / "figures"
 FIGDATA = common.ARTIFACTS / "figure_data"
