@@ -20,18 +20,17 @@ def add_path_arguments(parser: argparse.ArgumentParser) -> None:
         "--results-dir",
         type=Path,
         required=True,
-        help="Benchmark output directory from the selected fresh reproduction run.",
+        help="Benchmark output directory.",
     )
     parser.add_argument(
         "--artifacts-dir",
         type=Path,
         required=True,
-        help="Analysis artifact directory from the selected fresh reproduction run.",
+        help="Analysis artifact directory.",
     )
 
 
 def configure_paths(results_dir: Path, artifacts_dir: Path) -> None:
-    """Configure process-local input/output roots for an analysis command."""
     global RESULTS, ARTIFACTS
     RESULTS = results_dir.resolve()
     ARTIFACTS = artifacts_dir.resolve()
@@ -39,7 +38,7 @@ def configure_paths(results_dir: Path, artifacts_dir: Path) -> None:
 
 def require_file(path: Path) -> Path:
     if not path.is_file():
-        raise FileNotFoundError(f"Required reproduction input is missing: {path}")
+        raise FileNotFoundError(f"Required input is missing: {path}")
     return path
 
 CONDITION_MAP = {

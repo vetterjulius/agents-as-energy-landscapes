@@ -297,8 +297,8 @@ def make_internal(eps: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> li
 
 def make_ecdf(runs: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> list[Path]:
     rows = []
-    fig, axes = plt.subplots(1, 4, figsize=(13.5, 3.4), sharey=True)
-    for ax, scenario in zip(axes, SCENARIOS):
+    fig, axes = plt.subplots(2, 2, figsize=(9.5, 6.4), sharey=True)
+    for ax, scenario in zip(axes.flat, SCENARIOS):
         for condition in CONDITION_ORDER:
             values = np.sort(runs[(runs.scenario_id == scenario) &
                                   (runs.condition == condition)].ppee_10.to_numpy(float))
@@ -310,8 +310,8 @@ def make_ecdf(runs: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> list[
                         for i, (value, y) in enumerate(zip(values, ecdf), start=1))
         ax.set_title(f"{scenario} ($n$=20)")
         ax.set_xlabel("PPEE$_{10}$ (lower is better)")
-    axes[0].set_ylabel("ECDF")
-    axes[0].legend(frameon=False, fontsize=7)
+    axes[0, 0].set_ylabel("ECDF")
+    axes[0, 0].legend(frameon=False, fontsize=7)
     fig.suptitle("PPEE$_{10}$ empirical cumulative distributions", y=1.04)
     fig.tight_layout()
     outputs = list(save_figure(fig, output_dir, "ppee_distribution"))
