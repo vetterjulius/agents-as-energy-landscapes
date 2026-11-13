@@ -39,7 +39,6 @@ def main(argv: list[str] | None = None) -> None:
     eps = load_episodes()
     manifest = load_manifest()
 
-    # ------------------------------------------------------------------ matrix
     expected_cells = {(s, seed, c) for s in SCENARIOS for seed in SEEDS
                       for c in CONDITION_ORDER}
     observed_cells = set(map(tuple, runs[["scenario_id", "seed", "condition"]].astype(str).values))
@@ -59,12 +58,10 @@ def main(argv: list[str] | None = None) -> None:
           runs.groupby(["scenario_id", "seed"])["reference_id"].nunique().max() == 1,
           "ILP reference energy is shared by all conditions of the same problem")
 
-    # ------------------------------------------------------------------ seeds
     seeds_ok = all(sorted(g.seed.unique().tolist()) == SEEDS
                    for _, g in runs.groupby(["scenario_id", "condition"]))
     check("seeds 42..61 present for every cell", seeds_ok, "20 seeds x 4 scenarios x 5 conditions")
 
-    # ------------------------------------------------------------------ metadata
     check("conditions match frozen design",
           sorted(runs.condition.unique()) == CONDITION_ORDER, str(sorted(runs.condition.unique())))
     check("scenarios match frozen design",
@@ -91,7 +88,6 @@ def main(argv: list[str] | None = None) -> None:
           (runs.evaluation_landscape_id == "external_ground_truth").all(),
           "all metrics evaluated on external ground-truth landscape")
 
-    # ------------------------------------------------------------------ episodes
     check("episode row count", len(eps) == 20000, f"observed {len(eps)} episode rows (expected 20000)")
     eps_counts = eps.groupby("run_id")["episode"].agg(["nunique", "count"])
     check("episodes per run", (eps_counts["nunique"] == 50).all(),
@@ -105,7 +101,6 @@ def main(argv: list[str] | None = None) -> None:
           eps.groupby("run_id")[["scenario_id", "seed", "condition"]].nunique().max().max() == 1,
           "episode rows agree with runs.csv keys")
 
-    # ------------------------------------------------------------------ PPEE window
     rew = eps[eps.episode.isin(POST_WINDOW_EPISODES)]
     ppee_recomputed = rew.groupby("run_id").apply(
         lambda g: float(np.mean(np.maximum(0.0, g.external_energy - g.reference_energy))),
@@ -117,7 +112,6 @@ def main(argv: list[str] | None = None) -> None:
     check("PPEE_10 reproducible from episode-level data", max_dev < 1e-9,
           f"max |stored - recomputed| = {max_dev:.3e} over 400 runs")
 
-    # ------------------------------------------------------------------ finiteness
     # By-design NaN columns in episodes.csv:
     #   optimal / mip_gap            -> only the ILP solver sets these; None for greedy/SA
     #   kappa/theta/delta columns    -> NaN for B0 only (B0 has no landscape state)
@@ -149,7 +143,6 @@ def main(argv: list[str] | None = None) -> None:
           f"NaN columns: {dict(runs_nan)} (all confined to B0 adaptation-state columns; "
           f"all other numeric values finite)")
 
-    # ------------------------------------------------------------------ B0 semantics
     b0 = runs[runs.condition == "B0"]
     check("B0 uses zero energy evaluations",
           (b0.total_energy_evaluations == 0).all(), "all 80 B0 runs report 0 evaluations")
@@ -163,7 +156,6 @@ def main(argv: list[str] | None = None) -> None:
           bool(b0_eps[["kappa_norm", "theta_norm"]].isna().all().all()),
           "B0 records NaN adaptation state (no landscape state exists)")
 
-    # ------------------------------------------------------------------ B1-B4 budget
     for cond, expected in (("B1", None), ("B2", 500), ("B3", None), ("B4", 500)):
         sub = eps[(eps.condition == cond)]
         if cond in ("B2", "B4"):
@@ -175,7 +167,6 @@ def main(argv: list[str] | None = None) -> None:
             check(f"{cond} respects 500-eval budget every episode", ok,
                   f"max={sub.energy_evaluations.max()}")
 
-    # ------------------------------------------------------------------ manifest cross-check
     chunks = manifest.get("chunks", [])
     check("manifest expected_runs = 400", manifest.get("expected_runs") == 400,
           f"expected_runs={manifest.get('expected_runs')}")
@@ -232,7 +223,6 @@ def main(argv: list[str] | None = None) -> None:
         check("theta state chains across episodes (no leakage path)", False,
               "spot-check chunk not found")
 
-    # ------------------------------------------------------------------ environment
     meta = json.loads((results / "metadata.json").read_text(encoding="utf-8"))
     check("metadata git commit matches", meta.get("git_commit") == args.expected_commit,
           str(meta.get("git_commit")))
@@ -242,12 +232,10 @@ def main(argv: list[str] | None = None) -> None:
           meta.get("episodes") == 50 and meta.get("N") == 5 and len(meta.get("seeds", [])) == 20,
           "N=5 M=10 d=8 episodes=50 seeds=20")
 
-    # stored integrity.json
     stored = json.loads((results / "integrity.json").read_text(encoding="utf-8"))
     check("stored integrity.json all_checks_pass", stored.get("all_checks_pass") is True,
           "benchmark's own integrity report passes")
 
-    # ------------------------------------------------------------------ write report
     n_pass = sum(1 for _, ok, _ in checks if ok == "PASS")
     all_pass = n_pass == len(checks)
     lines = [

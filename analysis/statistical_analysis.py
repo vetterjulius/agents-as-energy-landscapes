@@ -21,7 +21,6 @@ RNG_SEED = 20260923
 BOOTSTRAP_DRAWS = 20000
 
 
-# --------------------------------------------------------------------------- tests
 def exact_signflip_permutation_p(diff: np.ndarray) -> float:
     """Exact two-sided sign-flip permutation test on the mean of paired differences.
 
@@ -102,7 +101,6 @@ def holm_bonferroni(p_values: list[float]) -> list[float]:
     return out.tolist()
 
 
-# --------------------------------------------------------------------------- pipeline
 def paired_comparison_row(runs: pd.DataFrame, metric: str, comp_name: str, cond_a: str,
                           cond_b: str, family: str, scenario: str) -> dict:
     pdiff = paired_differences(runs, metric, cond_a, cond_b, scenario)
@@ -162,7 +160,6 @@ def main(argv: list[str] | None = None) -> None:
     tables.mkdir(exist_ok=True)
     figdata.mkdir(exist_ok=True)
 
-    # ---------------------------------------------------------- Table 3: main PPEE results
     rows = []
     for scenario in SCENARIOS:
         for cond in CONDITION_ORDER:
@@ -181,7 +178,6 @@ def main(argv: list[str] | None = None) -> None:
                          "label": CONDITION_LABEL[cond], **s})
     pd.DataFrame(agg_rows).to_csv(figdata / "main_ppee_results_aggregate.csv", index=False)
 
-    # ---------------------------------------------------------- primary paired comparisons
     comp_rows = []
     for comp_name, a, b, family in COMPARISONS:
         for scenario in SCENARIOS:
@@ -202,7 +198,6 @@ def main(argv: list[str] | None = None) -> None:
             comp_df.loc[idx, "permutation_p_exact"].tolist())
     comp_df.to_csv(tables / "statistical_comparisons.csv", index=False)
 
-    # ---------------------------------------------------------- paired differences export (Fig 6)
     diff_rows = []
     for comp_name, a, b, family in COMPARISONS:
         for scenario in SCENARIOS:
@@ -212,7 +207,6 @@ def main(argv: list[str] | None = None) -> None:
                                   "seed": int(r["seed"]), "diff": float(r["diff"])})
     pd.DataFrame(diff_rows).to_csv(figdata / "paired_differences_ppee10.csv", index=False)
 
-    # ---------------------------------------------------------- secondary metrics (exploratory)
     secondary = {}
     for metric in ("cumulative_excess_energy", "recovery_time", "mean_external_energy",
                    "performance_drop"):
@@ -227,7 +221,6 @@ def main(argv: list[str] | None = None) -> None:
     sec_all.insert(0, "status", "secondary/exploratory")
     sec_all.to_csv(tables / "secondary_metric_comparisons.csv", index=False)
 
-    # ---------------------------------------------------------- B0 vs energy mean decomposition
     decomp_rows = []
     for scenario in SCENARIOS:
         means = {c: float(runs[(runs.scenario_id == scenario) & (runs.condition == c)]["ppee_10"].mean())
@@ -247,7 +240,6 @@ def main(argv: list[str] | None = None) -> None:
     decomp_df = pd.DataFrame(decomp_rows)
     decomp_df.to_csv(figdata / "effect_decomposition_means.csv", index=False)
 
-    # ---------------------------------------------------------- episode-level trajectories
     eps = eps.copy()
     eps["excess"] = np.maximum(0.0, eps.external_energy - eps.reference_energy)
     traj = (eps.groupby(["scenario_id", "condition", "episode"])
@@ -280,7 +272,6 @@ def main(argv: list[str] | None = None) -> None:
             pair_traj_rows.append(g[["comparison", "scenario", "episode", "mean", "se", "size"]])
     pd.concat(pair_traj_rows).to_csv(figdata / "static_vs_adaptive_excess_trajectory.csv", index=False)
 
-    # ---------------------------------------------------------- adaptation-state trajectories (from episodes.csv)
     state_cols = ["kappa_norm", "theta_norm", "theta_diff_norm", "delta_kappa_norm", "delta_theta_norm"]
     state_traj = (eps[eps.condition != "B0"]
                   .groupby(["scenario_id", "condition", "episode"])[state_cols]
@@ -306,7 +297,6 @@ def main(argv: list[str] | None = None) -> None:
     churn.to_csv(figdata / "assignment_churn_by_window.csv", index=False)
     churn.to_csv(tables / "assignment_churn_by_window.csv", index=False)
 
-    # ---------------------------------------------------------- cross-check against frozen statistics.csv
     frozen = pd.read_csv(common.RESULTS / "statistics.csv")
     frozen_map = {}
     label_to_comp = {
@@ -354,7 +344,6 @@ def main(argv: list[str] | None = None) -> None:
     verify_df["perm_p_abs_dev"] = (verify_df.our_perm_p - verify_df.frozen_perm_p).abs()
     verify_df.to_csv(figdata / "frozen_statistics_crosscheck.csv", index=False)
 
-    # ---------------------------------------------------------- headline JSON
     def get(comp, scenario, field):
         return float(comp_df[(comp_df.comparison == comp) & (comp_df.scenario == scenario)][field].iloc[0])
 
@@ -371,7 +360,6 @@ def main(argv: list[str] | None = None) -> None:
     }
     (common.ARTIFACTS / "stats_summary.json").write_text(json.dumps(headline, indent=2), encoding="utf-8")
 
-    # ---------------------------------------------------------- console digest
     pd.set_option("display.width", 200)
     print("=== Main PPEE_10 results (n / median / mean / zero-frac) ===")
     print(main_tbl[["scenario", "condition", "n", "median", "mean", "sd", "zero_fraction"]]

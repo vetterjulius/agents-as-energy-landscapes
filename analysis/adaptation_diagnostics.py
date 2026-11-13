@@ -50,7 +50,6 @@ def main(argv: list[str] | None = None) -> None:
     tables.mkdir(exist_ok=True)
     figdata.mkdir(exist_ok=True)
 
-    # ------------------------------------------------ Θ accuracy vs ground truth (episodes)
     # theta_diff_norm = ||Theta_t - G_gt(t)|| stored per episode for B1-B4.
     theta_rows = []
     for scenario in SCENARIOS:
@@ -69,7 +68,6 @@ def main(argv: list[str] | None = None) -> None:
     theta_df = pd.DataFrame(theta_rows)
     theta_df.to_csv(figdata / "theta_accuracy_by_condition.csv", index=False)
 
-    # ------------------------------------------------ Table 5: adaptation diagnostics
     diag_rows = []
     for scenario in SCENARIOS:
         for cond in CONDITION_ORDER:
@@ -114,7 +112,6 @@ def main(argv: list[str] | None = None) -> None:
     diag_df = pd.DataFrame(diag_rows)
     diag_df.to_csv(tables / "adaptation_diagnostics.csv", index=False)
 
-    # ------------------------------------------------ paired diagnostics tests (B3-B1, B4-B2)
     tests_rows = []
     for scenario in SCENARIOS:
         for metric, label in (("kappa_change_post", "kappa movement ep25-34"),
@@ -135,7 +132,6 @@ def main(argv: list[str] | None = None) -> None:
     tests_df = pd.DataFrame(tests_rows)
     tests_df.to_csv(tables / "adaptation_diagnostics_tests.csv", index=False)
 
-    # ------------------------------------------------ per-seed churn paired (for Fig 8)
     per_seed = (eps.groupby(["scenario_id", "condition", "seed"])
                 .agg(mean_reconfig=("reconfig_cost", "mean"),
                      mean_conflicts=("co_assignment_conflicts", "mean"),
@@ -172,7 +168,6 @@ def main(argv: list[str] | None = None) -> None:
     churn_paired.to_csv(figdata / "churn_paired_summary.csv", index=False)
     per_seed.to_csv(figdata / "per_seed_state_summary.csv", index=False)
 
-    # ------------------------------------------------ Θ-accuracy hypothesis tests (B3 vs B1, B4 vs B2)
     acc_rows = []
     for scenario in SCENARIOS:
         for a, b, comp in (("B3", "B1", "B3-B1"), ("B4", "B2", "B4-B2")):
@@ -191,7 +186,6 @@ def main(argv: list[str] | None = None) -> None:
     acc_df = pd.DataFrame(acc_rows)
     acc_df.to_csv(tables / "theta_accuracy_tests.csv", index=False)
 
-    # ------------------------------------------------ digest
     digest = {
         "theta_accuracy": theta_df.to_dict(orient="records"),
         "theta_accuracy_tests": acc_df.to_dict(orient="records"),

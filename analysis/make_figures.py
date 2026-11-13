@@ -57,7 +57,6 @@ def main(argv: list[str] | None = None) -> None:
     eps = eps.copy()
     eps["excess"] = np.maximum(0.0, eps.external_energy - eps.reference_energy)
 
-    # ------------------------------------------------ Figure 1: episode trajectories
     fig, axes = plt.subplots(2, 2, figsize=(9.5, 6.4), sharex=True)
     for ax, scenario in zip(axes.ravel(), SCENARIOS):
         sub = eps[(eps.scenario_id == scenario) & (eps.episode >= 15) & (eps.episode <= 34)]
@@ -86,7 +85,6 @@ def main(argv: list[str] | None = None) -> None:
      .agg(["mean", "sem", "size"]).reset_index()
      .to_csv(FIGDATA / "figure1_trajectory.csv", index=False))
 
-    # ------------------------------------------------ Figure 2: static vs adaptive paired diff
     traj = pd.read_csv(FIGDATA / "static_vs_adaptive_excess_trajectory.csv")
     fig, axes = plt.subplots(2, 2, figsize=(9.5, 6.4), sharex=True)
     comp_styles = {"B3-B1": ("-", "B3 (adaptive) $-$ B1 (static), Greedy", "#d62728"),
@@ -110,7 +108,6 @@ def main(argv: list[str] | None = None) -> None:
     fig.tight_layout()
     save(fig, "figure2_static_vs_adaptive")
 
-    # ------------------------------------------------ Figure 3: Theta adaptation (Dependency Change vs Stationary)
     st = pd.read_csv(FIGDATA / "state_trajectories_episode_means.csv")
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.6))
     panels = [("Dependency Change", "theta_diff_norm",
@@ -135,7 +132,6 @@ def main(argv: list[str] | None = None) -> None:
     sel = st[st.scenario_id.isin(["Dependency Change", "Stationary"])]
     sel.to_csv(FIGDATA / "figure3_theta_adaptation.csv", index=False)
 
-    # ------------------------------------------------ Figure 4: kappa adaptation (all scenarios)
     fig, axes = plt.subplots(2, 2, figsize=(9.5, 6.0), sharex=True)
     for ax, scenario in zip(axes.ravel(), SCENARIOS):
         for cond in ("B1", "B2", "B3", "B4"):
@@ -153,7 +149,6 @@ def main(argv: list[str] | None = None) -> None:
     save(fig, "figure4_kappa_adaptation")
     st.to_csv(FIGDATA / "figure4_kappa_adaptation.csv", index=False)
 
-    # ------------------------------------------------ Figure 5: PPEE_10 distributions (ECDF)
     fig, axes = plt.subplots(1, 4, figsize=(13.5, 3.4), sharey=True)
     ecdf_rows = []
     for ax, scenario in zip(axes, SCENARIOS):
@@ -175,7 +170,6 @@ def main(argv: list[str] | None = None) -> None:
     save(fig, "figure5_ppee_distribution")
     pd.DataFrame(ecdf_rows).to_csv(FIGDATA / "figure5_ppee_distribution.csv", index=False)
 
-    # ------------------------------------------------ Figure 6: paired effects with CIs
     diffs = pd.read_csv(FIGDATA / "paired_differences_ppee10.csv")
     fig, axes = plt.subplots(2, 3, figsize=(11.5, 6.4), sharex=True)
     order = ["B0-B1", "B0-B2", "B1-B3", "B2-B4", "B1-B2", "B3-B4"]
@@ -217,7 +211,6 @@ def main(argv: list[str] | None = None) -> None:
                              "n": len(sub)})
     pd.DataFrame(med_rows).to_csv(FIGDATA / "figure6_paired_effects.csv", index=False)
 
-    # ------------------------------------------------ Figure 7: scenario x condition heatmap
     main = pd.read_csv(FIGDATA / "main_ppee_results.csv")
     mat_med = main.pivot(index="condition", columns="scenario", values="median")
     mat_mean = main.pivot(index="condition", columns="scenario", values="mean")
@@ -244,7 +237,6 @@ def main(argv: list[str] | None = None) -> None:
     save(fig, "figure7_scenario_heatmap")
     main.to_csv(FIGDATA / "figure7_scenario_heatmap.csv", index=False)
 
-    # ------------------------------------------------ Figure 8: adaptation diagnostics
     churn = pd.read_csv(FIGDATA / "assignment_churn_by_window.csv")
     diag = pd.read_csv(common.ARTIFACTS / "tables" / "adaptation_diagnostics.csv")
     fig, axes = plt.subplots(2, 2, figsize=(11.5, 7.0))
