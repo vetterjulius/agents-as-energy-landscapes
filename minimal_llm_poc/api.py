@@ -82,7 +82,6 @@ def generate(
     started = time.perf_counter()
 
     for attempt in range(config.API_MAX_RETRIES + 1):
-        # Rate pacing
         now = time.monotonic()
         wait = config.MIN_REQUEST_INTERVAL_SEC - (now - _last_request_at)
         if _last_request_at and wait > 0:

@@ -26,9 +26,9 @@ class TaskEvaluation:
     task_id: str
     slot_index: int
     assigned_agent: str
-    base_score: float         # 0.0 or 1.0
-    synergy_bonus: float      # 0.0 or 0.5
-    total_score: float        # base_score + synergy_bonus
+    base_score: float
+    synergy_bonus: float
+    total_score: float
     eval_method: str          # "deterministic" or "llm_judge"
     details: str
     raw_output: str
@@ -40,7 +40,6 @@ def evaluate_deterministic(task: TaskDef, output: str) -> Tuple[float, str]:
 
     missing: List[str] = []
     for pat in task.required_patterns:
-        # Case-insensitive check
         if pat.lower() not in output_lower:
             missing.append(pat)
 
@@ -90,7 +89,6 @@ def evaluate_with_judge(
     elif "```" in cleaned:
         cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
 
-    # Resilient JSON extraction
     try:
         data = json.loads(cleaned)
         score = float(data.get("score", 0))
@@ -99,13 +97,11 @@ def evaluate_with_judge(
     except Exception:
         pass
 
-    # Regex search for {"score": 1} or {"score": 0} anywhere in output
     match = re.search(r'["\']score["\']\s*:\s*([01])', raw)
     if match:
         score = float(match.group(1))
         return score, f"Regex extracted score {score} from: {raw[:60]}"
 
-    # Fallback keyword match
     if '"score": 1' in raw or "'score': 1" in raw or 'score: 1' in raw:
         return 1.0, "Substring matched pass"
 
@@ -132,7 +128,7 @@ def evaluate_task(
         slot_index=task.slot_index,
         assigned_agent=assigned_agent,
         base_score=base_score,
-        synergy_bonus=0.0,  # Computed at episode level
+        synergy_bonus=0.0,
         total_score=base_score,
         eval_method=method,
         details=details,
@@ -143,7 +139,7 @@ def evaluate_task(
 def compute_episode_evaluations(
     episode: int,
     evaluations: List[TaskEvaluation],
-    assignment_map: Dict[int, str],  # slot_index -> agent_id
+    assignment_map: Dict[int, str],
 ) -> List[TaskEvaluation]:
     """Compute co-assignment synergy bonuses across the episode's tasks.
 
@@ -163,7 +159,6 @@ def compute_episode_evaluations(
             for p_slot in partners:
                 p_agent = assignment_map.get(p_slot)
                 p_eval = eval_by_slot.get(p_slot)
-                # Same agent and partner also solved correctly
                 if p_agent == agent and p_eval is not None and p_eval.base_score >= 1.0:
                     has_synergy = True
                     break

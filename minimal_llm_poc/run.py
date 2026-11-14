@@ -80,7 +80,6 @@ def run_experiment(
             print(f"  [Ep {episode} | Phase {phase}] Assigning tasks...")
             orch_res = orch.assign(episode, tasks, seed=seed)
 
-            # Step 1: Execute all 8 tasks with their assigned agent
             raw_evals: List[evaluation.TaskEvaluation] = []
             for t_idx, task in enumerate(tasks):
                 agent_id = orch_res.assignment_map[t_idx]
@@ -88,7 +87,6 @@ def run_experiment(
 
                 print(f"    Task {task.slot_index} ({task.id}) -> {agent_id} ({agent_def.model})...", end="", flush=True)
 
-                # Generate output from assigned agent
                 gen = api.generate(
                     prompt=task.prompt,
                     system_prompt=agent_def.system_prompt,
@@ -96,7 +94,6 @@ def run_experiment(
                     mock=mock,
                 )
 
-                # Evaluate single task
                 ev = evaluation.evaluate_task(
                     task=task,
                     output=gen.text,
@@ -106,17 +103,14 @@ def run_experiment(
                 raw_evals.append(ev)
                 print(f" [{ev.eval_method}] base={ev.base_score}")
 
-            # Step 2: Compute co-assignment synergy bonuses
             final_evals = evaluation.compute_episode_evaluations(
                 episode=episode,
                 evaluations=raw_evals,
                 assignment_map=orch_res.assignment_map,
             )
 
-            # Step 3: Trigger post-episode online adaptation (for dynamic SA)
             orch.adapt(episode, orch_res.assignment_matrix, context)
 
-            # Record metrics
             ep_base_score = sum(e.base_score for e in final_evals) / len(final_evals)
             ep_synergy_bonus = sum(e.synergy_bonus for e in final_evals)
             ep_total_score = sum(e.total_score for e in final_evals)
@@ -159,14 +153,12 @@ def run_experiment(
 
     elapsed_total = time.perf_counter() - total_start
 
-    # Save output artifacts
     episodes_df = pd.DataFrame(episode_records)
     episodes_df.to_csv(out_path / "episodes.csv", index=False)
 
     tasks_df = pd.DataFrame(task_records)
     tasks_df.to_csv(out_path / "task_traces.csv", index=False)
 
-    # Compute high-level summary
     summary_by_condition = {}
     for cond in conditions:
         cdf = episodes_df[episodes_df["condition"] == cond]

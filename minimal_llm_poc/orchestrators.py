@@ -26,8 +26,8 @@ from .scenario import AGENTS, NUM_AGENTS, NUM_TASKS_PER_EPISODE, TaskDef, get_in
 class OrchestrationResult:
     condition: str
     episode: int
-    assignment_matrix: torch.Tensor          # Shape (N, M)
-    assignment_map: Dict[int, str]           # slot_index -> agent_id
+    assignment_matrix: torch.Tensor
+    assignment_map: Dict[int, str]
     internal_energy: float
     ground_truth_energy: float
     evaluations_used: int
@@ -48,11 +48,9 @@ def make_problem_context(
     M = len(tasks)
     d = s.shape[1]
 
-    # Mild co-assignment cost matrix to discourage clustering all tasks on one agent
     C = torch.full((M, M), 0.05, dtype=torch.float32)
     C.fill_diagonal_(0.0)
 
-    # Risk weights
     W_risk = torch.zeros(3 * d, 1, dtype=torch.float32)
 
     return ProblemContext(
@@ -110,7 +108,6 @@ class BaselineOrchestrator(BaseOrchestrator):
         solver_res = self.solver.solve(context)
         X = solver_res.X
 
-        # Evaluate against ground truth
         gt_theta = torch.tensor(get_interaction_graph(episode), dtype=torch.float32)
         gt_state = LandscapeState(kappa=torch.zeros(context.N, context.d), Theta=gt_theta)
         gt_landscape = Landscape(context, gt_state)
@@ -143,7 +140,6 @@ class StaticEnergySAOrchestrator(BaseOrchestrator):
             min_temperature=config.SA_MIN_TEMPERATURE,
             cooling_rate=config.SA_COOLING_RATE,
         )
-        # Fixed initial belief: Phase 1 dependencies
         self.theta_0 = torch.tensor(get_interaction_graph(0), dtype=torch.float32)
 
     def assign(
@@ -160,7 +156,6 @@ class StaticEnergySAOrchestrator(BaseOrchestrator):
         landscape = Landscape(context, state)
         budgeted = BudgetedLandscape(landscape, max_evaluations=config.MAX_ENERGY_EVALUATIONS)
 
-        # Initial round-robin assignment
         initial_X = torch.zeros(context.N, context.M)
         for m in range(context.M):
             initial_X[m % context.N, m] = 1.0
@@ -172,7 +167,6 @@ class StaticEnergySAOrchestrator(BaseOrchestrator):
         )
         X = solver_res.X
 
-        # Evaluate against actual ground truth for this episode
         gt_theta = torch.tensor(get_interaction_graph(episode), dtype=torch.float32)
         gt_state = LandscapeState(kappa=torch.zeros(context.N, context.d), Theta=gt_theta)
         gt_landscape = Landscape(context, gt_state)
@@ -210,7 +204,6 @@ class DynamicEnergySAOrchestrator(BaseOrchestrator):
             eta_memory=config.ETA_MEMORY,
             eta_theta=config.ETA_THETA,
         )
-        # Starts with Theta_0
         self.current_state = LandscapeState(
             kappa=torch.zeros(NUM_AGENTS, config.DIM),
             Theta=torch.tensor(get_interaction_graph(0), dtype=torch.float32),
@@ -237,7 +230,6 @@ class DynamicEnergySAOrchestrator(BaseOrchestrator):
         )
         X = solver_res.X
 
-        # Evaluate on ground truth
         gt_theta = torch.tensor(get_interaction_graph(episode), dtype=torch.float32)
         gt_state = LandscapeState(kappa=torch.zeros(context.N, context.d), Theta=gt_theta)
         gt_landscape = Landscape(context, gt_state)
