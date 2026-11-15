@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "theta_ablation_traces.npz"
+DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "unit_theta_ablation_traces.npz"
 DEFAULT_CONTROL_CSV = REPO_ROOT / "additional_experiments" / "data" / "control_checks.csv"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta-persistence-mechanism"
 

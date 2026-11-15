@@ -325,7 +325,7 @@ def main() -> int:
             trace = traces[variant][SEEDS.index(seed)]
             for field in ("theta_before", "theta_after", "eta", "consistency", "cbar"):
                 npz_payload[f"seed_{seed}_{key}_{field}"] = trace[field]
-    np.savez_compressed(output / "theta_ablation_traces.npz", **npz_payload)
+    np.savez_compressed(output / "unit_theta_ablation_traces.npz", **npz_payload)
     data_dir = REPO_ROOT / "additional_experiments" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(data_dir / "unit_theta_ablation_traces.npz", **npz_payload)
@@ -355,7 +355,7 @@ def main() -> int:
             "Changing X_t from A to B while holding evaluation ground truth at A must change Theta according to observations, not according to ground truth.",
         ],
         "files": [
-            "theta_ablation_traces.npz", "per_seed_metrics.csv", "summary_metrics.csv", "control_checks.csv",
+            "unit_theta_ablation_traces.npz", "per_seed_metrics.csv", "summary_metrics.csv", "control_checks.csv",
             "plot_1_theta_ground_truth_similarity.png", "plot_2_theta_drift.png", "plot_3_adaptation_activity.png",
         ],
     }
