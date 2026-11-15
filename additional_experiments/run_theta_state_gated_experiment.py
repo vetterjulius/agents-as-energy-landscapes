@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-Proof-of-Mechanism Test for State-Gated Persistent Dynamic Theta Adaptation.
-
-Isolated experiment script: does NOT modify production code, runner.py, adaptation.py,
-or existing benchmark files.
-"""
 
 from __future__ import annotations
 

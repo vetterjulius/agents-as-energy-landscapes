@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Isolated Change-Gated Theta Adaptation Mechanism Experiment.
-
-Builds directly on .storage/analysis/theta-adaptation-ablation-20260917/theta_ablation_traces.npz
-Without modifying production code, benchmark runners, or running new benchmark iterations.
-"""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "theta_ablation_traces.npz"
+DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "unit_theta_ablation_traces.npz"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta_change_gated"
 
 

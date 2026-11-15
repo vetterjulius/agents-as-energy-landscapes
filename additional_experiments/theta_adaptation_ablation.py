@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Isolated synthetic ablation of assignment-based Theta adaptation.
-
-This script is deliberately independent of the production benchmark.  It does
-not import or modify the benchmark runner, solvers, scenarios, configuration,
-or existing result files.
-"""
 from __future__ import annotations
 
 import argparse

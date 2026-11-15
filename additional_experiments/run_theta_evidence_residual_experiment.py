@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Isolated Proof-of-Mechanism Test: Evidence-Scaled Residual Adaptation in CONVERGED.
-
-Tests whether scaling the residual learning rate in CONVERGED by observable mismatch
-(||C_t - Theta_t||_F) reduces residual parameter error post-CONVERGED while protecting
-stationarity against noise drift.
-"""
 
 from __future__ import annotations
 

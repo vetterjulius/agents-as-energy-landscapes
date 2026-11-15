@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-Isolated Proof-of-Mechanism Test: Residual Learning Rate in CONVERGED State.
-
-Investigates whether setting eta_residual > 0 in CONVERGED reduces the asymptotic parameter
-error without destroying the stationary noise protection of State-Gated Persistent Dynamic.
-"""
 
 from __future__ import annotations
 
