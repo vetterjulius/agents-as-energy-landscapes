@@ -332,9 +332,9 @@ def main() -> int:
             for field in ("theta_before", "theta_after", "eta", "consistency", "cbar"):
                 npz_payload[f"seed_{seed}_{key}_{field}"] = trace[field]
     np.savez_compressed(output / "theta_ablation_traces.npz", **npz_payload)
-    data_dir = REPO_ROOT / "additional_experiments" / "unit_theta" / "data"
+    data_dir = REPO_ROOT / "additional_experiments" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(data_dir / "theta_ablation_traces.npz", **npz_payload)
+    np.savez_compressed(data_dir / "unit_theta_ablation_traces.npz", **npz_payload)
 
     write_csv(output / "per_seed_metrics.csv", all_rows)
     write_csv(output / "summary_metrics.csv", summary_rows)
