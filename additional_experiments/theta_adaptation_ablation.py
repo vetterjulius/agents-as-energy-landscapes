@@ -18,7 +18,7 @@ from scipy.stats import spearmanr
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "additional_experiments" / "unit_theta" / "theta_adaptation_ablation"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta_adaptation_ablation"
 
 M = 6
 EPISODES = 90

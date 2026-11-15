@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "unit_theta" / "data" / "theta_ablation_traces.npz"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "additional_experiments" / "unit_theta" / "theta_change_gated"
+DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "theta_ablation_traces.npz"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta_change_gated"
 
 
 M = 6
