@@ -15,7 +15,10 @@ import numpy as np
 import pandas as pd
 import torch
 
-from controlled_benchmark.adaptation import EpisodeAdaptationManager
+from controlled_benchmark.adaptation import (
+    EpisodeAdaptationManager,
+    compute_cooccurrence_observation,
+)
 from controlled_benchmark.config import BenchmarkConfig
 from controlled_benchmark.metrics import (
     EpisodeRecord,
@@ -80,15 +83,8 @@ def _slug(value: str) -> str:
 
 
 def _observed_cooccurrence(X: torch.Tensor, epsilon: float = 1e-8) -> torch.Tensor:
-    """Reproduce the adaptation module's normalized, symmetric off-diagonal C_t."""
-    co = X.T @ X
-    co_sum = co.sum().item()
-    if co_sum < epsilon:
-        return torch.zeros_like(co)
-    co_norm = co / (co_sum + epsilon)
-    result = (co_norm + co_norm.T) / 2.0
-    result.fill_diagonal_(0.0)
-    return result
+    """Delegation to canonical unnormalized co-assignment observation for backwards compatibility."""
+    return compute_cooccurrence_observation(X)
 
 
 def _validate_diagnostic_tensor(name: str, value: torch.Tensor) -> None:
@@ -341,7 +337,6 @@ class ControlledBenchmarkRunner:
                 )
             theta_before = current_state.Theta.clone()
             kappa_before = current_state.kappa.clone()
-            C_t = _observed_cooccurrence(X)
             internal_energy = solver_landscape.evaluate(X)
             external_energy = ground_truth.evaluate(X)
             if self.cfg.verbose_diagnostics:
@@ -401,10 +396,11 @@ class ControlledBenchmarkRunner:
             # theta_before is the state used to solve episode t; theta_after is the state
             # produced by X_t and is the state used to solve episode t+1.
             previous_state = current_state.clone()
-            adaptation_trace: Optional[Dict[str, Any]] = {} if self.cfg.verbose_diagnostics else None
+            adaptation_trace: Dict[str, Any] = {}
             if solver_id in ("Conventional Greedy", "conventional_greedy"):
                 theta_after = current_state.clone()
-                if adaptation_trace is not None:
+                C_t = compute_cooccurrence_observation(X)
+                if self.cfg.verbose_diagnostics:
                     adaptation_trace.update({
                         "kappa_update_active": False,
                         "theta_update_active": False,
@@ -416,6 +412,7 @@ class ControlledBenchmarkRunner:
                 theta_after = manager.step(
                     current_state, X, context, diagnostics=adaptation_trace
                 )
+                C_t = adaptation_trace["theta_observation"]
             for name, value in (
                 ("assignment_matrix", X),
                 ("cooccurrence_matrix", C_t),

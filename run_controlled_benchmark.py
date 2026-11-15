@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="results/controlled_benchmark",
+        default="results/controlled_benchmark_unit_theta",
         help="Directory where results (CSV, JSON, README) will be written.",
     )
     parser.add_argument(

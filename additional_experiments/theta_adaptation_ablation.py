@@ -18,7 +18,7 @@ from scipy.stats import spearmanr
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta-adaptation-ablation"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "additional_experiments" / "unit_theta" / "theta_adaptation_ablation"
 
 M = 6
 EPISODES = 90
@@ -43,13 +43,11 @@ def offdiag(matrix: np.ndarray) -> np.ndarray:
 
 
 def observed_cooccurrence(X: np.ndarray, epsilon: float = 1e-8) -> np.ndarray:
-    """Exact normalized off-diagonal symmetric C used by production Theta."""
+    """Exact unnormalized off-diagonal symmetric C used by production Theta."""
     co = X.T @ X
-    total = float(co.sum())
-    if total < epsilon:
+    if float(np.abs(co).sum()) < epsilon:
         return np.zeros_like(co, dtype=np.float64)
-    normalized = co / (total + epsilon)
-    return offdiag((normalized + normalized.T) / 2.0)
+    return offdiag((co + co.T) / 2.0)
 
 
 def canonical_assignment(structure: str) -> np.ndarray:
@@ -334,6 +332,9 @@ def main() -> int:
             for field in ("theta_before", "theta_after", "eta", "consistency", "cbar"):
                 npz_payload[f"seed_{seed}_{key}_{field}"] = trace[field]
     np.savez_compressed(output / "theta_ablation_traces.npz", **npz_payload)
+    data_dir = REPO_ROOT / "additional_experiments" / "unit_theta" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(data_dir / "theta_ablation_traces.npz", **npz_payload)
 
     write_csv(output / "per_seed_metrics.csv", all_rows)
     write_csv(output / "summary_metrics.csv", summary_rows)
@@ -342,7 +343,7 @@ def main() -> int:
 
     manifest = {
         "timestamp": str(datetime.datetime.now()),
-        "experiment": "Isolated Theta adaption ablation",
+        "experiment": "Isolated Theta adaptation ablation (unit-scale co-assignment)",
         "seeds": SEEDS,
         "variants": list(VARIANTS),
         "M": M,
@@ -351,7 +352,7 @@ def main() -> int:
         "change_episode": CHANGE_EPISODE,
         "dynamic_parameters": {"eta": ETA},
         "persistent_parameters": {"gamma": GAMMA, "tau_low": TAU_LOW, "tau_high": TAU_HIGH, "eta_max": ETA},
-        "ground_truth_normalization": "GroundTruth_A and GroundTruth_B are exact normalized C matrices of the canonical A/B assignments, matching the production C scale.",
+        "ground_truth_normalization": "GroundTruth_A and GroundTruth_B are exact unnormalized off-diagonal C matrices of the canonical A/B assignments, matching the production unit C scale.",
         "observation_generation": "Each seed has one deterministic X trajectory shared by all variants; each episode has at most one randomly selected task moved with probability 0.30.",
         "timing": "theta_before[t] is Theta_t before processing C_t; theta_after[t] is Theta_{t+1].",
         "adaptation_inputs": "All variants receive only the shared observed C_t; ground truth is used only for metrics and controls.",

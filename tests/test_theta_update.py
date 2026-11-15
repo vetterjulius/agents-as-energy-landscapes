@@ -28,13 +28,13 @@ def make_problem_and_state(M: int = 3, theta_val: float = 1.0):
 
 
 def _compute_C(X: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
-    """Helper: compute the normalized, symmetrized, offdiag co-assignment matrix C from X."""
+    """Independent oracle: compute unnormalized, symmetric, off-diagonal co-assignment matrix C from X."""
+    if X.numel() == 0 or X.abs().sum().item() < eps:
+        M = X.shape[1] if X.ndim >= 2 else 0
+        return torch.zeros((M, M), dtype=X.dtype, device=X.device)
     co = X.T @ X
-    co_sum = co.sum().item()
-    if co_sum < eps:
-        return torch.zeros_like(co)
-    co_norm = co / (co_sum + eps)
-    C = (co_norm + co_norm.T) / 2.0
+    C = (co + co.T) / 2.0
+    C = C.clone()
     C.fill_diagonal_(0.0)
     return C
 
@@ -155,3 +155,69 @@ def test_zero_assignment_theta_unchanged():
     state1 = manager.step(state, X_zero, problem)
 
     assert torch.allclose(state1.Theta, state.Theta, atol=1e-7)
+
+
+def test_cooccurrence_observation_properties():
+    """Test canonical observation properties: binary indicators, symmetry, dtype, zero-diagonal."""
+    from controlled_benchmark.adaptation import compute_cooccurrence_observation
+
+    # Valid one-hot assignment (each task to exactly one agent):
+    # Agent 0: tasks 0, 1
+    # Agent 1: task 2
+    X = torch.tensor([
+        [1.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ], dtype=torch.float64)
+    X_clone = X.clone()
+
+    C = compute_cooccurrence_observation(X)
+
+    # 1. Preserves dtype and device
+    assert C.dtype == X.dtype
+    assert C.device == X.device
+
+    # 2. Input tensor not modified in place
+    assert torch.equal(X, X_clone)
+
+    # 3. Exact symmetry
+    assert torch.equal(C, C.T)
+
+    # 4. Zero diagonal
+    assert torch.equal(C.diagonal(), torch.zeros(3, dtype=torch.float64))
+
+    # 5. Correct binary off-diagonal co-assignment indicators
+    expected = torch.tensor([
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+    ], dtype=torch.float64)
+    assert torch.equal(C, expected)
+
+    # 6. All-zero assignment input
+    X_all_zero = torch.zeros((2, 3), dtype=torch.float32)
+    C_zero = compute_cooccurrence_observation(X_all_zero)
+    assert torch.equal(C_zero, torch.zeros((3, 3), dtype=torch.float32))
+
+    # 7. Empty assignment input
+    X_empty = torch.zeros((0, 3), dtype=torch.float32)
+    C_empty = compute_cooccurrence_observation(X_empty)
+    assert torch.equal(C_empty, torch.zeros((3, 3), dtype=torch.float32))
+
+
+def test_diagnostics_theta_observation_agreement():
+    """The observation used for adaptation must match diagnostics['theta_observation']."""
+    problem, state = make_problem_and_state(M=3, theta_val=0.5)
+    eta = 0.2
+    manager = EpisodeAdaptationManager(adaptation_mode="theta-only", eta_theta=eta)
+    X = torch.tensor([[1.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+    diag: dict = {}
+    new_state = manager.step(state, X, problem, diagnostics=diag)
+
+    C_oracle = _compute_C(X)
+    assert "theta_observation" in diag
+    assert torch.equal(diag["theta_observation"], C_oracle)
+
+    expected_theta = (1.0 - eta) * state.Theta + eta * diag["theta_observation"]
+    expected_theta.fill_diagonal_(0.0)
+    assert torch.allclose(new_state.Theta, expected_theta, atol=1e-7)

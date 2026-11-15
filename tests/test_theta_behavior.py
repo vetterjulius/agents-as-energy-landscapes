@@ -53,13 +53,13 @@ def _make_state(M: int, N: int = 2, d: int = 2,
 
 
 def _compute_C(X: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
-    """Reference implementation of C_t from X_t (mirrors adaptation.py exactly)."""
+    """Independent oracle for unnormalized C_t from X_t."""
+    if X.numel() == 0 or X.abs().sum().item() < eps:
+        M = X.shape[1] if X.ndim >= 2 else 0
+        return torch.zeros((M, M), dtype=X.dtype, device=X.device)
     co = X.T @ X
-    co_sum = co.sum().item()
-    if co_sum < eps:
-        return torch.zeros_like(co)
-    co_norm = co / (co_sum + eps)
-    C = (co_norm + co_norm.T) / 2.0
+    C = (co + co.T) / 2.0
+    C = C.clone()
     C.fill_diagonal_(0.0)
     return C
 

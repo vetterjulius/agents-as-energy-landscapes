@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "data" / "theta_ablation_traces.npz"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "additional_experiments" / "theta-change-gated"
+DEFAULT_INPUT_NPZ = REPO_ROOT / "additional_experiments" / "unit_theta" / "data" / "theta_ablation_traces.npz"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "additional_experiments" / "unit_theta" / "theta_change_gated"
 
 
 M = 6
@@ -62,11 +62,9 @@ def canonical_assignment(structure: str) -> np.ndarray:
 
 def observed_cooccurrence(X: np.ndarray, epsilon: float = 1e-8) -> np.ndarray:
     co = X.T @ X
-    total = float(co.sum())
-    if total < epsilon:
+    if float(np.abs(co).sum()) < epsilon:
         return np.zeros_like(co, dtype=np.float64)
-    normalized = co / (total + epsilon)
-    return offdiag((normalized + normalized.T) / 2.0)
+    return offdiag((co + co.T) / 2.0)
 
 def simulate_variant(
     variant: str,

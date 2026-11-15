@@ -25,7 +25,7 @@ class BenchmarkConfig:
     """Explicit, fully serializable configuration for the controlled benchmark."""
 
     mode: str = "quick"  # 'quick' or 'research'
-    benchmark_version: str = "1.1.0"
+    benchmark_version: str = "1.2.0"
     experiment_id: str = "controlled_benchmark_paired"
     git_commit: str = field(default_factory=get_git_revision)
 
@@ -98,7 +98,7 @@ class BenchmarkConfig:
     risk_weight: float = 1.0
 
     # Output directory
-    output_dir: str = "results/controlled_benchmark"
+    output_dir: str = "results/controlled_benchmark_unit_theta"
 
     # Optional comprehensive per-episode mechanism logging (does not affect execution)
     verbose_diagnostics: bool = False

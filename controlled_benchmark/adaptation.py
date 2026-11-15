@@ -8,6 +8,27 @@ from energy.risk import RiskPredictor
 from landscape import LandscapeState, ProblemContext
 
 
+def compute_cooccurrence_observation(X: torch.Tensor) -> torch.Tensor:
+    """Compute the unnormalized, symmetric off-diagonal co-assignment observation matrix C.
+
+    C = offdiag((X.T @ X + (X.T @ X).T) / 2)
+
+    Preserves input dtype and device, has a zero diagonal, and returns all-zeros
+    for an empty or all-zero assignment input without modifying X in place.
+    """
+    if X.numel() == 0:
+        M = X.shape[1] if X.ndim >= 2 else 0
+        return torch.zeros((M, M), dtype=X.dtype, device=X.device)
+    co = X.T @ X
+    if co.is_floating_point():
+        C = (co + co.T) / 2.0
+    else:
+        C = torch.div(co + co.T, 2, rounding_mode="floor")
+    C = C.clone()
+    C.fill_diagonal_(0)
+    return C
+
+
 class EpisodeAdaptationManager:
     """
     Explicit episode-boundary adaptation manager.
@@ -121,25 +142,19 @@ class EpisodeAdaptationManager:
 
         # 2. Structural Dependency (Theta) adaptation update
         #
-        # New semantics: exponentially smoothed, observation-based co-assignment representation.
+        # Observation semantics: unnormalized, symmetric off-diagonal co-assignment indicators.
         #
-        #   C = X_t.T @ X_t / (sum(X_t.T @ X_t) + eps)
-        #   C = offdiag((C + C.T) / 2)
+        #   C = offdiag((X_t.T @ X_t + (X_t.T @ X_t).T) / 2)
         #   Theta_new = (1 - eta_theta) * Theta_old + eta_theta * C
         #   Theta_new = offdiag((Theta_new + Theta_new.T) / 2)
         #
         # Theta is updated exclusively from the observed assignment X_t.
         # No running_co baseline. No additive residual/integrator semantics.
+        theta_observation = compute_cooccurrence_observation(X)
         if update_theta:
-            co = X.T @ X  # shape (M, M)
-            co_sum = co.sum().item()
-            if co_sum >= self.epsilon:
-                # Normalize, symmetrize, zero diagonal -> observed C_t
-                co_norm = co / (co_sum + self.epsilon)
-                C = self._offdiag((co_norm + co_norm.T) / 2.0)
-
+            if X.numel() > 0 and (X.abs().sum().item() >= self.epsilon):
                 # EMA update toward C_t
-                Theta_new = (1.0 - self.eta_theta) * current_state.Theta + self.eta_theta * C
+                Theta_new = (1.0 - self.eta_theta) * current_state.Theta + self.eta_theta * theta_observation
 
                 # Re-symmetrize and zero diagonal
                 new_Theta = self._offdiag((Theta_new + Theta_new.T) / 2.0)
@@ -151,13 +166,6 @@ class EpisodeAdaptationManager:
             new_Theta = current_state.Theta.clone()
 
         if diagnostics is not None:
-            co = X.T @ X
-            co_sum = co.sum().item()
-            if co_sum >= self.epsilon:
-                co_norm = co / (co_sum + self.epsilon)
-                theta_observation = self._offdiag((co_norm + co_norm.T) / 2.0)
-            else:
-                theta_observation = torch.zeros_like(current_state.Theta)
             diagnostics.update(
                 {
                     "kappa_update_active": update_kappa,

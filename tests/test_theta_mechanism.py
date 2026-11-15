@@ -41,11 +41,14 @@ def _assignment(pair_a: tuple[int, int], pair_b: tuple[int, int]) -> torch.Tenso
     return X
 
 
-def _observed_C(X: torch.Tensor) -> torch.Tensor:
-    """Reference C calculation matching EpisodeAdaptationManager.step."""
+def _observed_C(X: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    """Independent oracle for unnormalized C calculation."""
+    if X.numel() == 0 or X.abs().sum().item() < eps:
+        M = X.shape[1] if X.ndim >= 2 else 0
+        return torch.zeros((M, M), dtype=X.dtype, device=X.device)
     co = X.T @ X
-    co_norm = co / (co.sum() + 1e-8)
-    C = (co_norm + co_norm.T) / 2.0
+    C = (co + co.T) / 2.0
+    C = C.clone()
     C.fill_diagonal_(0.0)
     return C
 
