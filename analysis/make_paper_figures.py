@@ -22,8 +22,9 @@ PAPER_FIGURES = common.ROOT / "paper" / "figures"
 T_CRIT = stats.t.ppf(0.975, df=19)
 
 plt.rcParams.update({
-    "figure.dpi": 110, "savefig.dpi": 300, "font.size": 9,
-    "axes.titlesize": 10, "axes.labelsize": 9, "legend.fontsize": 8,
+    "figure.dpi": 110, "savefig.dpi": 300, "font.size": 10,
+    "axes.titlesize": 11, "axes.labelsize": 10, "legend.fontsize": 9,
+    "xtick.labelsize": 10, "ytick.labelsize": 10,
     "axes.spines.top": False, "axes.spines.right": False,
     "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.5,
 })
@@ -202,11 +203,12 @@ def make_paired(runs: pd.DataFrame, comparisons: pd.DataFrame,
         ax.axvline(0.0, color="0.4", lw=0.8)
         ax.set_title(name)
         ax.set_yticks(range(4), list(reversed(SCENARIOS)))
-        ax.set_xlabel("Paired Δ PPEE$_{10}$ (first − second; negative favors first)")
     axes[0, 0].set_ylabel("Scenario")
     fig.suptitle("Paired PPEE$_{10}$ effects: dots, mean ± 95% t CI, and median; n=20",
                  y=0.995)
-    fig.tight_layout()
+    fig.supxlabel("Paired Δ PPEE$_{10}$ (first − second; negative favors first)",
+                  fontsize=10, y=0.01)
+    fig.tight_layout(rect=[0, 0.04, 1, 1])
     outputs = list(save_figure(fig, output_dir, "paired_effects"))
     write_data(pd.DataFrame(rows), artifact_dir, "paired_effects")
     return outputs
@@ -236,7 +238,7 @@ def make_temporal(eps: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> li
         ax.set_ylabel("Excess external energy")
     axes[1, 0].set_xlabel("Episode (25: changed environment; 26: first updated-state decision)")
     axes[1, 1].set_xlabel("Episode")
-    axes[0, 0].legend(frameon=False, fontsize=7)
+    axes[0, 0].legend(frameon=False, fontsize=8)
     fig.suptitle("External-energy trajectories around episode 25; mean ± 95% t CI",
                  y=0.995)
     fig.tight_layout()
@@ -285,7 +287,7 @@ def make_internal(eps: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> li
             ax.set_title(label)
             ax.set_ylabel(scenario if col == 0 else "")
             ax.set_xlabel("Episode")
-    axes[0, 0].legend(frameon=False, fontsize=7)
+    axes[0, 0].legend(frameon=False, fontsize=8)
     fig.suptitle("Internal states: mean ± 95% t CI; ground-truth distance is post-hoc only",
                  y=0.995)
     fig.tight_layout()
@@ -311,7 +313,7 @@ def make_ecdf(runs: pd.DataFrame, output_dir: Path, artifact_dir: Path) -> list[
         ax.set_title(f"{scenario} ($n$=20)")
         ax.set_xlabel("PPEE$_{10}$ (lower is better)")
     axes[0, 0].set_ylabel("ECDF")
-    axes[0, 0].legend(frameon=False, fontsize=7)
+    axes[0, 0].legend(frameon=False, fontsize=8)
     fig.suptitle("PPEE$_{10}$ empirical cumulative distributions", y=1.04)
     fig.tight_layout()
     outputs = list(save_figure(fig, output_dir, "ppee_distribution"))
@@ -381,10 +383,10 @@ def make_diagnostics(eps: pd.DataFrame, artifact_dir: Path,
                          "condition": row.condition, "value": row.final_theta_diff_mean})
     axes[1, 1].set_title("Final representation error (post-hoc)")
     axes[1, 1].set_ylabel(r"$\|\Theta_{49}-\Theta_{\mathrm{gt},49}\|_F$")
-    axes[0, 0].legend(frameon=False, fontsize=7)
-    axes[0, 1].legend(frameon=False, fontsize=7)
-    axes[1, 0].legend(frameon=False, fontsize=7)
-    axes[1, 1].legend(frameon=False, fontsize=7)
+    axes[0, 0].legend(frameon=False, fontsize=8)
+    axes[0, 1].legend(frameon=False, fontsize=8)
+    axes[1, 0].legend(frameon=False, fontsize=8)
+    axes[1, 1].legend(frameon=False, fontsize=8)
     for ax in axes.ravel():
         ax.set_xlabel("Condition")
     fig.suptitle("Secondary adaptation diagnostics (descriptive; mean over seeds)",

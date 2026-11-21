@@ -13,6 +13,14 @@ import analysis.common as common
 from analysis.figures_common import COLORS, LABEL_SHORT
 
 
+plt.rcParams.update({
+    "font.size": 10,
+    "axes.titlesize": 13, "axes.labelsize": 11, "legend.fontsize": 9,
+    "xtick.labelsize": 11, "ytick.labelsize": 11,
+    "figure.titlesize": 13,
+})
+
+
 SCENARIOS = ("Stationary", "Dependency Change")
 CONDITIONS = ("B1", "B2", "B3", "B4")
 SERIES = (
@@ -73,7 +81,7 @@ def main(argv: list[str] | None = None) -> None:
             ax.set_ylabel(scenario if col == 0 else "")
             ax.set_xlabel("Episode")
             ax.grid(True, alpha=0.25, linewidth=0.5)
-    axes[0, 0].legend(frameon=False, fontsize=7)
+    axes[0, 0].legend(frameon=False, fontsize=8)
     fig.suptitle(
         r"Internal adaptation states: mean over 20 seeds; dashed line marks episode 25",
         y=0.995,

@@ -13,6 +13,13 @@ from matplotlib.patches import FancyBboxPatch
 import analysis.common as common
 
 
+plt.rcParams.update({
+    "font.size": 10,
+    "axes.titlesize": 11, "axes.labelsize": 10,
+    "xtick.labelsize": 10, "ytick.labelsize": 10,
+})
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     common.add_path_arguments(parser)
@@ -41,7 +48,7 @@ def main(argv: list[str] | None = None) -> None:
     for x, y, w, h, text in boxes:
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02",
                                     facecolor="#eaf2f8", edgecolor="#34495e"))
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=10)
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=11)
     ax.annotate("", xy=(0.38, 0.675), xytext=(0.27, 0.675),
                 arrowprops={"arrowstyle": "->", "lw": 1.4})
     ax.annotate("", xy=(0.73, 0.675), xytext=(0.62, 0.675),
@@ -50,16 +57,16 @@ def main(argv: list[str] | None = None) -> None:
                 arrowprops={"arrowstyle": "->", "lw": 1.4})
     ax.annotate("", xy=(0.73, 0.225), xytext=(0.62, 0.225),
                 arrowprops={"arrowstyle": "->", "lw": 1.4})
-    ax.text(0.50, 0.46, "X_t observed", ha="center", va="center", fontsize=9)
+    ax.text(0.50, 0.46, "X_t observed", ha="center", va="center", fontsize=10)
     ax.text(0.50, 0.04,
             "Episode 25 uses the pre-change state; the update from X_25 first affects episode 26",
-            ha="center", fontsize=10, fontweight="bold")
-    ax.text(0.03, 0.88, "Information boundary", fontsize=13, fontweight="bold")
+            ha="center", fontsize=11, fontweight="bold")
+    ax.text(0.03, 0.88, "Information boundary", fontsize=14, fontweight="bold")
     ax.text(0.03, 0.84,
             "Ground truth, reference optimum, and PPEE are unavailable during decision-making",
-            fontsize=9)
+            fontsize=10)
     ax.text(0.03, 0.50, "\n".join(f"{a}: {b} ({c})" for a, b, c in labels),
-            va="top", fontsize=8)
+            va="top", fontsize=9)
     fig.tight_layout()
     pdf = output_dir / "experimental_design_information_boundary.pdf"
     png = output_dir / "experimental_design_information_boundary.png"
