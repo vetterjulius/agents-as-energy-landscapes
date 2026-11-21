@@ -1,6 +1,6 @@
 # Minimal LLM PoC - Dependency Change Transfer
 
-This package implements the minimal empirical transfer of the **Dependency Change** scenario from the `controlled_benchmark` to real LLM agents.
+This package implements an example implementation of the **Dependency Change** scenario from the `controlled_benchmark` with LLM calls.
 
 ## Key Design Principles
 

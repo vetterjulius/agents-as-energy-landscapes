@@ -36,3 +36,7 @@ sign-flip analysis in `artifacts/tables/statistical_comparisons.csv`, with all
 `2^20` sign patterns enumerated and Holm correction applied within each
 pre-specified test family. `results/statistics.csv` is not used for the
 paper's inferential results.
+
+## Example LLM-implementation
+
+For instrucitons on how to run the transfer example with LLM calls, please refer to the corresponding [README](minimal_llm_poc/README.md)
